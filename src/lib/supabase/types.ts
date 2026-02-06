@@ -9,6 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agents: {
+        Row: {
+          id: string
+          name: string
+          emoji: string
+          color: string
+          role: string
+          badge: 'LEAD' | 'INT' | 'SPC'
+          whatsapp_group: string | null
+          openclaw_agent_id: string
+          created_at: string
+        }
+        Insert: {
+          id: string
+          name: string
+          emoji: string
+          color: string
+          role: string
+          badge?: 'LEAD' | 'INT' | 'SPC'
+          whatsapp_group?: string | null
+          openclaw_agent_id?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          emoji?: string
+          color?: string
+          role?: string
+          badge?: 'LEAD' | 'INT' | 'SPC'
+          whatsapp_group?: string | null
+          openclaw_agent_id?: string
+          created_at?: string
+        }
+      }
       products: {
         Row: {
           id: string
@@ -44,12 +79,19 @@ export type Database = {
           product_id: string
           title: string
           description: string | null
-          status: 'backlog' | 'in_progress' | 'review' | 'done'
-          priority: 'low' | 'medium' | 'high' | 'urgent'
+          status: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+          priority: 'low' | 'normal' | 'high' | 'urgent'
           assignee_type: 'agent' | 'human' | null
           assignee_id: string | null
           assignee_name: string | null
           deliverable_url: string | null
+          deliverables: string[] | null
+          context: string | null
+          seo_alignment: string | null
+          linked_refs: { type: string; url: string; title: string }[] | null
+          completion_note: string | null
+          completed_at: string | null
+          tags: string[] | null
           created_at: string
           updated_at: string
         }
@@ -58,12 +100,19 @@ export type Database = {
           product_id: string
           title: string
           description?: string | null
-          status?: 'backlog' | 'in_progress' | 'review' | 'done'
-          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          status?: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+          priority?: 'low' | 'normal' | 'high' | 'urgent'
           assignee_type?: 'agent' | 'human' | null
           assignee_id?: string | null
           assignee_name?: string | null
           deliverable_url?: string | null
+          deliverables?: string[] | null
+          context?: string | null
+          seo_alignment?: string | null
+          linked_refs?: { type: string; url: string; title: string }[] | null
+          completion_note?: string | null
+          completed_at?: string | null
+          tags?: string[] | null
           created_at?: string
           updated_at?: string
         }
@@ -72,12 +121,19 @@ export type Database = {
           product_id?: string
           title?: string
           description?: string | null
-          status?: 'backlog' | 'in_progress' | 'review' | 'done'
-          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          status?: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+          priority?: 'low' | 'normal' | 'high' | 'urgent'
           assignee_type?: 'agent' | 'human' | null
           assignee_id?: string | null
           assignee_name?: string | null
           deliverable_url?: string | null
+          deliverables?: string[] | null
+          context?: string | null
+          seo_alignment?: string | null
+          linked_refs?: { type: string; url: string; title: string }[] | null
+          completion_note?: string | null
+          completed_at?: string | null
+          tags?: string[] | null
           created_at?: string
           updated_at?: string
         }
@@ -225,6 +281,7 @@ export type Database = {
   }
 }
 
+export type Agent = Database['public']['Tables']['agents']['Row']
 export type Product = Database['public']['Tables']['products']['Row']
 export type Task = Database['public']['Tables']['tasks']['Row']
 export type AgentActivity = Database['public']['Tables']['agent_activity']['Row']
