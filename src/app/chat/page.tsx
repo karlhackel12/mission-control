@@ -1,99 +1,71 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Hash, RefreshCw, MessageCircle, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Send, Hash } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import { getAgents, getMessages, sendMessage, getPendingDiscussionPrompts, respondToDiscussionPrompt, type Agent } from '@/lib/supabase/queries'
-import type { SquadChat, DiscussionPrompt } from '@/lib/supabase/types'
-
-type SquadChatWithType = SquadChat & {
-  discussion_prompt_id?: string | null
-  message_type?: 'message' | 'discussion_prompt' | 'discussion_response' | 'system'
-}
+import type { Id } from '../../../convex/_generated/dataModel'
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<SquadChatWithType[]>([])
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [pendingPrompts, setPendingPrompts] = useState<DiscussionPrompt[]>([])
   const [newMessage, setNewMessage] = useState('')
-  const [selectedAgent, setSelectedAgent] = useState('Chief')
-  const [loading, setLoading] = useState(true)
+  const [selectedAgentId, setSelectedAgentId] = useState<Id<"agents"> | null>(null)
   const [sending, setSending] = useState(false)
-  const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [agentsData, messagesData, promptsData] = await Promise.all([
-        getAgents(),
-        getMessages(100),
-        getPendingDiscussionPrompts()
-      ])
-      setAgents(agentsData)
-      setMessages(messagesData as SquadChatWithType[])
-      setPendingPrompts(promptsData)
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Convex queries - real-time updates!
+  const agents = useQuery(api.agents.list)
+  const messages = useQuery(api.messages.listWithAgents, { limit: 100 })
+  
+  // Convex mutation
+  const sendMessage = useMutation(api.messages.send)
 
   useEffect(() => {
     setMounted(true)
-    fetchData()
-  }, [fetchData])
+  }, [])
 
+  // Set default agent when agents load
+  useEffect(() => {
+    if (agents && agents.length > 0 && !selectedAgentId) {
+      // Find "Chief" agent or use first one
+      const chief = agents.find(a => a.name === 'Chief')
+      setSelectedAgentId(chief?._id ?? agents[0]._id)
+    }
+  }, [agents, selectedAgentId])
+
+  // Scroll to bottom when messages change
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || sending) return
+    if (!newMessage.trim() || sending || !selectedAgentId) return
     
     setSending(true)
     
-    let result: SquadChat | null = null
-    
-    if (replyingTo) {
-      // Responding to a discussion prompt
-      result = await respondToDiscussionPrompt(replyingTo, {
-        agent_name: selectedAgent,
-        message: newMessage,
-        is_human: false
+    try {
+      await sendMessage({
+        agentId: selectedAgentId,
+        content: newMessage,
+        isHuman: false,
+        messageType: 'message',
       })
-      setReplyingTo(null)
-    } else {
-      // Regular message
-      result = await sendMessage({
-        agent_name: selectedAgent,
-        message: newMessage,
-        task_ref: null
-      })
-    }
-    
-    if (result) {
-      setMessages(prev => [...prev, result as SquadChatWithType])
       setNewMessage('')
-      // Refresh to get updated prompt status
-      fetchData()
+    } catch (error) {
+      console.error('Error sending message:', error)
     }
+    
     setSending(false)
-  }
-  
-  const handleReplyToPrompt = (promptId: string) => {
-    setReplyingTo(promptId)
-    // Focus the input
-    const input = document.querySelector('input[placeholder="Type a message..."]') as HTMLInputElement
-    input?.focus()
   }
 
   if (!mounted) return null
+
+  const loading = agents === undefined || messages === undefined
 
   if (loading) {
     return (
@@ -112,12 +84,12 @@ export default function ChatPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Squad Chat</h1>
-          <p className="text-gray-500">Async communication between agents</p>
+          <p className="text-gray-500">Real-time communication between agents (powered by Convex)</p>
         </div>
-        <Button variant="outline" onClick={fetchData}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          Live updates
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-6">
@@ -139,87 +111,37 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   messages.map((msg) => {
-                    const agent = agents.find(a => a.name === msg.agent_name)
-                    const isDiscussionPrompt = msg.message_type === 'discussion_prompt'
-                    const isDiscussionResponse = msg.message_type === 'discussion_response'
-                    const prompt = isDiscussionPrompt ? pendingPrompts.find(p => p.squad_chat_id === msg.id) : null
-                    const responseCount = prompt?.collected_context?.length || 0
-                    
                     return (
                       <div 
-                        key={msg.id} 
-                        className={`flex items-start gap-3 group ${
-                          isDiscussionPrompt ? 'bg-amber-50 border border-amber-200 rounded-lg p-3 -mx-1' : ''
-                        } ${
-                          isDiscussionResponse ? 'pl-8 border-l-2 border-blue-200 ml-4' : ''
-                        }`}
+                        key={msg._id} 
+                        className="flex items-start gap-3 group"
                       >
                         <div 
                           className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
-                          style={{ backgroundColor: agent ? `${agent.color}20` : '#f3f4f6' }}
+                          style={{ backgroundColor: msg.agent ? `${msg.agent.color}20` : '#f3f4f6' }}
                         >
-                          {agent?.emoji || '🤖'}
+                          {msg.isHuman ? '👤' : (msg.agent?.emoji || '🤖')}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="font-semibold text-gray-900">{msg.agent_name}</span>
-                            <span className="text-xs text-gray-400">
-                              {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                            <span className="font-semibold text-gray-900">
+                              {msg.agent?.name || 'Unknown'}
                             </span>
-                            {msg.task_ref && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                                {msg.task_ref}
+                            {msg.isHuman && (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                Human
                               </span>
                             )}
-                            {isDiscussionPrompt && (
-                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded flex items-center gap-1">
-                                <MessageCircle className="w-3 h-3" />
-                                Discussion Prompt
-                              </span>
-                            )}
-                            {isDiscussionResponse && (
+                            <span className="text-xs text-gray-400">
+                              {formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true })}
+                            </span>
+                            {msg.taskRef && (
                               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                                Response
+                                {msg.taskRef}
                               </span>
                             )}
                           </div>
-                          <p className="text-gray-700 mt-1 whitespace-pre-wrap">{msg.message}</p>
-                          
-                          {/* Discussion Prompt Status & Actions */}
-                          {isDiscussionPrompt && prompt && (
-                            <div className="mt-3 flex items-center gap-4 text-sm">
-                              <div className="flex items-center gap-1 text-gray-500">
-                                {prompt.status === 'collecting' ? (
-                                  <Clock className="w-4 h-4 text-amber-500" />
-                                ) : prompt.status === 'resolved' ? (
-                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-red-500" />
-                                )}
-                                <span>
-                                  {responseCount}/{prompt.required_responses} responses
-                                </span>
-                              </div>
-                              <span className="text-gray-400">•</span>
-                              <span className="text-gray-500">
-                                Timeout: {prompt.timeout_minutes}min
-                              </span>
-                              {prompt.status === 'collecting' && (
-                                <>
-                                  <span className="text-gray-400">•</span>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleReplyToPrompt(prompt.id)}
-                                    className="h-7 text-xs"
-                                  >
-                                    <MessageCircle className="w-3 h-3 mr-1" />
-                                    Reply
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          )}
+                          <p className="text-gray-700 mt-1 whitespace-pre-wrap">{msg.content}</p>
                         </div>
                       </div>
                     )
@@ -231,31 +153,16 @@ export default function ChatPage() {
 
             {/* Message Input */}
             <div className="border-t p-4">
-              {/* Reply indicator */}
-              {replyingTo && (
-                <div className="mb-2 flex items-center gap-2 text-sm bg-amber-50 text-amber-700 px-3 py-2 rounded-lg">
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Replying to discussion prompt</span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="ml-auto h-6 text-amber-600 hover:text-amber-800"
-                    onClick={() => setReplyingTo(null)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">Send as:</span>
                   <select 
-                    value={selectedAgent}
-                    onChange={(e) => setSelectedAgent(e.target.value)}
+                    value={selectedAgentId || ''}
+                    onChange={(e) => setSelectedAgentId(e.target.value as Id<"agents">)}
                     className="text-sm border rounded px-2 py-1"
                   >
-                    {agents.map(agent => (
-                      <option key={agent.id} value={agent.name}>
+                    {agents?.map(agent => (
+                      <option key={agent._id} value={agent._id}>
                         {agent.emoji} {agent.name}
                       </option>
                     ))}
@@ -266,15 +173,14 @@ export default function ChatPage() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                    placeholder={replyingTo ? "Type your response to the discussion..." : "Type a message..."}
-                    className={`flex-1 ${replyingTo ? 'border-amber-300 focus:ring-amber-500' : ''}`}
+                    placeholder="Type a message..."
+                    className="flex-1"
                     disabled={sending}
                   />
                   <Button 
                     onClick={handleSendMessage} 
                     size="icon" 
                     disabled={sending}
-                    className={replyingTo ? 'bg-amber-500 hover:bg-amber-600' : ''}
                   >
                     <Send className="w-4 h-4" />
                   </Button>
@@ -291,8 +197,8 @@ export default function ChatPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {agents.map((agent) => (
-                <div key={agent.id} className="flex items-center gap-3">
+              {agents?.filter(a => a.isActive).map((agent) => (
+                <div key={agent._id} className="flex items-center gap-3">
                   <div className="relative">
                     <div 
                       className="w-8 h-8 rounded-full flex items-center justify-center text-sm"

@@ -27,23 +27,31 @@ export const PRIORITY_COLORS = {
   urgent: 'bg-red-100 text-red-700',
 } as const
 
-export const STATUS_LABELS = {
+export const STATUS_LABELS: Record<string, string> = {
   inbox: 'INBOX',
   assigned: 'ASSIGNED',
   in_progress: 'IN PROGRESS',
   review: 'REVIEW',
   done: 'DONE',
   failed: 'FAILED',
-} as const
+  // Convex statuses
+  backlog: 'BACKLOG',
+  todo: 'TODO',
+  cancelled: 'CANCELLED',
+}
 
-export const STATUS_COLORS = {
+export const STATUS_COLORS: Record<string, string> = {
   inbox: '#F59E0B',
   assigned: '#3B82F6',
   in_progress: '#8B5CF6',
   review: '#F97316',
   done: '#10B981',
   failed: '#DC2626',
-} as const
+  // Convex statuses
+  backlog: '#F59E0B',
+  todo: '#3B82F6',
+  cancelled: '#6B7280',
+}
 
 export const BADGE_COLORS = {
   LEAD: 'bg-amber-100 text-amber-700 border-amber-200',

@@ -53,7 +53,9 @@ export const sync = mutation({
   args: {
     openclawId: v.string(),
     name: v.string(),
+    description: v.optional(v.string()),
     schedule: v.string(),
+    product: v.optional(v.string()),
     agentId: v.optional(v.id("agents")),
     payload: v.optional(v.any()),
     nextRunAtMs: v.optional(v.number()),
@@ -68,7 +70,9 @@ export const sync = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         name: args.name,
+        description: args.description,
         schedule: args.schedule,
+        product: args.product,
         agentId: args.agentId,
         payload: args.payload,
         nextRunAtMs: args.nextRunAtMs,
@@ -81,6 +85,49 @@ export const sync = mutation({
         createdAt: Date.now(),
       });
     }
+  },
+});
+
+// List cron jobs with agent info (enriched for UI)
+export const listWithAgents = query({
+  args: {
+    product: v.optional(v.string()),
+    activeOnly: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    let jobs;
+    
+    if (args.product) {
+      jobs = await ctx.db
+        .query("cronJobs")
+        .withIndex("by_product", (q) => q.eq("product", args.product))
+        .collect();
+    } else {
+      jobs = await ctx.db.query("cronJobs").collect();
+    }
+    
+    if (args.activeOnly) {
+      jobs = jobs.filter((j) => j.isActive);
+    }
+    
+    // Get all agents for enrichment
+    const agents = await ctx.db.query("agents").collect();
+    const agentMap = new Map(agents.map((a) => [a._id, a]));
+    
+    // Enrich with agent data
+    const enriched = jobs.map((job) => {
+      const agent = job.agentId ? agentMap.get(job.agentId) : null;
+      return {
+        ...job,
+        agent: agent ? {
+          name: agent.name,
+          emoji: agent.emoji,
+          color: agent.color,
+        } : null,
+      };
+    });
+    
+    return enriched.sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 

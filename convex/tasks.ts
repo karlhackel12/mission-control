@@ -179,3 +179,53 @@ export const remove = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+// List tasks with agent info (enriched for dashboard)
+export const listWithAgents = query({
+  args: {
+    product: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let tasks;
+    
+    if (args.product) {
+      tasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_product", (q) => q.eq("product", args.product))
+        .collect();
+    } else {
+      tasks = await ctx.db.query("tasks").collect();
+    }
+    
+    // Get all agents
+    const agents = await ctx.db.query("agents").collect();
+    const agentMap = new Map(agents.map((a) => [a._id, a]));
+    
+    // Enrich tasks with agent data
+    const enriched = tasks.map((task) => {
+      const assignee = task.assignedTo ? agentMap.get(task.assignedTo) : null;
+      const creator = task.createdBy ? agentMap.get(task.createdBy) : null;
+      return {
+        ...task,
+        assignee: assignee ? {
+          name: assignee.name,
+          emoji: assignee.emoji,
+          color: assignee.color,
+        } : null,
+        creator: creator ? {
+          name: creator.name,
+          emoji: creator.emoji,
+          color: creator.color,
+        } : null,
+      };
+    });
+    
+    // Sort by priority then by createdAt
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+    return enriched.sort((a, b) => {
+      const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (pDiff !== 0) return pDiff;
+      return b.createdAt - a.createdAt;
+    });
+  },
+});

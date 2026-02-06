@@ -68,6 +68,14 @@ export default defineSchema({
     agentId: v.id("agents"),
     content: v.string(),
     replyTo: v.optional(v.id("messages")),
+    taskRef: v.optional(v.string()),
+    isHuman: v.optional(v.boolean()),
+    messageType: v.optional(v.union(
+      v.literal("message"),
+      v.literal("discussion_prompt"),
+      v.literal("discussion_response"),
+      v.literal("system")
+    )),
     timestamp: v.number(),
   })
     .index("by_agent", ["agentId"])
@@ -77,7 +85,9 @@ export default defineSchema({
   cronJobs: defineTable({
     openclawId: v.string(),
     name: v.string(),
+    description: v.optional(v.string()),
     schedule: v.string(), // cron expression or description
+    product: v.optional(v.string()), // "hellopeople", "transforce", "golance", etc
     agentId: v.optional(v.id("agents")),
     payload: v.optional(v.any()),
     nextRunAtMs: v.optional(v.number()),
@@ -92,7 +102,8 @@ export default defineSchema({
   })
     .index("by_openclaw_id", ["openclawId"])
     .index("by_agent", ["agentId"])
-    .index("by_next_run", ["nextRunAtMs"]),
+    .index("by_next_run", ["nextRunAtMs"])
+    .index("by_product", ["product"]),
 
   // Memories table - with vector search support
   memories: defineTable({

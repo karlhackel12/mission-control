@@ -322,3 +322,36 @@ export const getTypes = query({
     return Array.from(types).sort();
   },
 });
+
+// List activities with agent info (enriched for dashboard)
+export const listWithAgents = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    
+    const activities = await ctx.db
+      .query("activities")
+      .withIndex("by_timestamp")
+      .order("desc")
+      .take(limit);
+    
+    // Get all agents
+    const agents = await ctx.db.query("agents").collect();
+    const agentMap = new Map(agents.map((a) => [a._id, a]));
+    
+    // Enrich with agent data
+    return activities.map((activity) => {
+      const agent = agentMap.get(activity.agentId);
+      return {
+        ...activity,
+        agent: agent ? {
+          name: agent.name,
+          emoji: agent.emoji,
+          color: agent.color,
+        } : null,
+      };
+    });
+  },
+});
