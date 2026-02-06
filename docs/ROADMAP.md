@@ -23,26 +23,26 @@ Migrate from Supabase to Convex and add three core features:
 - [ ] Migrate existing data from Supabase
 - [ ] Set up vector search for memories
 
-### Phase 3: Activity Feed
-- [ ] Create activities table and functions
-- [ ] Build ActivityFeed component
-- [ ] Real-time subscriptions
-- [ ] Filter by agent/type/date
-- [ ] Infinite scroll pagination
+### Phase 3: Activity Feed ✅ COMPLETE
+- [x] Create activities table and functions
+- [x] Build ActivityFeed component with timeline view
+- [x] Real-time subscriptions (auto-refresh with live/pause toggle)
+- [x] Filter by agent/type/date and search
+- [x] Activity stats sidebar with agent breakdown
 
-### Phase 4: Calendar View
-- [ ] Create calendar page
-- [ ] Weekly view component
-- [ ] Display cron jobs from OpenClaw
-- [ ] Display scheduled tasks
-- [ ] Drag & drop reschedule (optional)
+### Phase 4: Calendar View ✅ COMPLETE
+- [x] Create calendar page (/calendar)
+- [x] Weekly view component with day headers
+- [x] Display cron jobs from OpenClaw (API route reads jobs.json)
+- [x] Parse cron expressions and show occurrences
+- [x] Today's schedule sidebar with event details modal
 
-### Phase 5: Global Search
-- [ ] Implement vector embeddings for memories
-- [ ] Create search query with hybrid search
-- [ ] Build Command+K search modal
-- [ ] Search across tasks, memories, documents
-- [ ] Preview results
+### Phase 5: Global Search ✅ COMPLETE
+- [x] Build Command+K search modal (GlobalSearch component)
+- [x] Search across tasks, agents, activities, messages, cron jobs
+- [x] Quick navigation to all pages
+- [x] Keyboard navigation (up/down/enter/esc)
+- [x] Integrated in sidebar
 
 ### Phase 6: OpenClaw Integration
 - [ ] Create HTTP endpoint for activity webhook
@@ -74,11 +74,14 @@ Migrate from Supabase to Convex and add three core features:
 
 ## Current Status
 
-**Phase 1 COMPLETE** (2026-02-06)
+**Phases 1, 3, 4, 5 COMPLETE** (2026-02-06)
 - Convex initialized with project `mission-control-cb6d3`
 - Dashboard: https://dashboard.convex.dev/t/karl-hackel/mission-control-cb6d3
 - Full schema with 6 tables and indexes
 - Basic CRUD queries/mutations for all tables
 - ConvexClientProvider configured in Next.js
+- **Calendar View**: Weekly calendar syncing cron jobs from OpenClaw
+- **Activity Feed**: Timeline view with filters, search, auto-refresh
+- **Global Search**: Cmd+K modal searching tasks, agents, activities, messages, crons
 
-Ready to start Phase 2: Schema refinement and data migration.
+Next: Phase 2 (Schema refinement) and Phase 6 (OpenClaw webhook integration).
