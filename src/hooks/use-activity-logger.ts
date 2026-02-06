@@ -9,7 +9,7 @@ export interface LogActivityOptions {
   type: string;
   action: string;
   details?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -57,7 +57,7 @@ export function useActivityLogger(defaultAgentName?: string) {
   );
 
   const logTaskCompleted = useCallback(
-    async (action: string, metadata?: Record<string, any>) => {
+    async (action: string, metadata?: Record<string, unknown>) => {
       return logActivity({
         type: 'task_completed',
         action,
@@ -68,7 +68,7 @@ export function useActivityLogger(defaultAgentName?: string) {
   );
 
   const logTaskCreated = useCallback(
-    async (action: string, metadata?: Record<string, any>) => {
+    async (action: string, metadata?: Record<string, unknown>) => {
       return logActivity({
         type: 'task_created',
         action,
@@ -79,7 +79,7 @@ export function useActivityLogger(defaultAgentName?: string) {
   );
 
   const logError = useCallback(
-    async (action: string, metadata?: Record<string, any>) => {
+    async (action: string, metadata?: Record<string, unknown>) => {
       return logActivity({
         type: 'error',
         action,
@@ -90,7 +90,7 @@ export function useActivityLogger(defaultAgentName?: string) {
   );
 
   const logToolCall = useCallback(
-    async (action: string, details?: string, metadata?: Record<string, any>) => {
+    async (action: string, details?: string, metadata?: Record<string, unknown>) => {
       return logActivity({
         type: 'tool_call',
         action,
@@ -102,7 +102,7 @@ export function useActivityLogger(defaultAgentName?: string) {
   );
 
   const logMessage = useCallback(
-    async (action: string, details?: string, metadata?: Record<string, any>) => {
+    async (action: string, details?: string, metadata?: Record<string, unknown>) => {
       return logActivity({
         type: 'message_sent',
         action,
@@ -114,7 +114,7 @@ export function useActivityLogger(defaultAgentName?: string) {
   );
 
   const logDecision = useCallback(
-    async (action: string, details?: string, metadata?: Record<string, any>) => {
+    async (action: string, details?: string, metadata?: Record<string, unknown>) => {
       return logActivity({
         type: 'decision',
         action,

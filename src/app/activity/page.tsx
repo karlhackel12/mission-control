@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
-import { ActivityFeed } from '@/components/activity'
+import { ActivityFeed, ActivityCharts } from '@/components/activity'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -170,6 +170,11 @@ export default function ActivityPage() {
       </header>
 
       <main className="p-6">
+        {/* Charts Section */}
+        <div className="mb-6">
+          <ActivityCharts days={7} />
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           <StatCard

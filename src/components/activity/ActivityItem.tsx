@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -65,7 +65,8 @@ function parseTextWithLinks(text: string): React.ReactNode {
 /**
  * Parse metadata and make URLs clickable
  */
-function renderMetadataValue(value: any, depth = 0): React.ReactNode {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderMetadataValue(value: unknown, depth = 0): React.ReactNode {
   if (depth > 5) return JSON.stringify(value);
   
   if (typeof value === 'string') {

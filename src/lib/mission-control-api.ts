@@ -23,7 +23,7 @@ export interface LogActivityParams {
   type: string;
   action: string;
   details?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpsertSessionParams {
@@ -32,7 +32,7 @@ export interface UpsertSessionParams {
   channel?: string;
   status: 'active' | 'idle' | 'sleeping' | 'terminated';
   model?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface RecordTaskRunParams {
