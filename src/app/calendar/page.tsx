@@ -9,7 +9,8 @@ import { WeeklyCalendar } from '@/components/calendar/WeeklyCalendar'
 import { EventDetailModal } from '@/components/calendar/EventDetailModal'
 import { CronJobEvent } from '@/components/calendar/CalendarEvent'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Database } from 'lucide-react'
+import { RefreshCw, Database, ArrowLeft, Calendar } from 'lucide-react'
+import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function CalendarPage() {
@@ -59,9 +60,23 @@ export default function CalendarPage() {
   }, [seedMutation])
   
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-2">
-        <CalendarHeader
+    <div className="min-h-screen bg-[#FAFAF8]">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-gray-400 hover:text-gray-600 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-500" />
+            Calendar
+          </h1>
+        </div>
+      </header>
+      
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-2">
+          <CalendarHeader
           currentDate={currentDate}
           onPreviousWeek={handlePreviousWeek}
           onNextWeek={handleNextWeek}
@@ -115,6 +130,7 @@ export default function CalendarPage() {
         open={selectedEvent !== null}
         onClose={() => setSelectedEvent(null)}
       />
+      </div>
     </div>
   )
 }

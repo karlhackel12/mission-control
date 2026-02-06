@@ -15,8 +15,10 @@ import {
   CheckCircle2,
   Wrench,
   Database,
-  Trash2
+  Trash2,
+  ArrowLeft
 } from 'lucide-react'
+import Link from 'next/link'
 
 // Stats card component
 function StatCard({ 
@@ -131,11 +133,16 @@ export default function ActivityPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Activity className="w-6 h-6 text-amber-500" />
-              Activity Feed
-            </h1>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Activity className="w-6 h-6 text-amber-500" />
+                Activity Feed
+              </h1>
+            </div>
             <p className="text-gray-500 mt-1">
               Real-time monitoring of all agent actions
             </p>

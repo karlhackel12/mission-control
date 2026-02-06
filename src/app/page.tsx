@@ -10,7 +10,6 @@ import {
   Calendar, 
   Activity, 
   Clock, 
-  CheckCircle2, 
   AlertCircle,
   Users,
   Zap,

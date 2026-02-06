@@ -14,8 +14,10 @@ import {
   Clock, 
   Play, 
   History,
-  RefreshCw
+  RefreshCw,
+  ArrowLeft
 } from 'lucide-react'
+import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { PRODUCTS } from '@/lib/constants'
 
@@ -58,7 +60,13 @@ export default function CronsPage() {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold text-gray-900">CRON JOBS</h1>
+            <Link href="/" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-purple-500" />
+              Cron Jobs
+            </h1>
             <div className="flex gap-1">
               <button
                 onClick={() => setSelectedProduct(null)}

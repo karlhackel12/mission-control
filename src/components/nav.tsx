@@ -7,8 +7,7 @@ import {
   Calendar, 
   Activity, 
   Clock, 
-  ListTodo,
-  Settings
+  ListTodo
 } from 'lucide-react'
 
 const navItems = [
