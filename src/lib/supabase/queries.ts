@@ -2,7 +2,8 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import type { Task, Product, AgentActivity, SquadChat, CronJob, CronRun, Agent as AgentType, Database, Document, Notification, DiscussionPrompt, DiscussionResponse } from './types'
+import type { Task, Product, AgentActivity, SquadChat, CronJob, CronRun, Agent as AgentType, Database, Document, Notification } from './types'
+import type { DiscussionPrompt, DiscussionResponse } from './types'
 
 export type TaskInsert = Database['public']['Tables']['tasks']['Insert']
 export type TaskUpdate = Database['public']['Tables']['tasks']['Update']
@@ -593,11 +594,11 @@ export async function cancelDiscussionPrompt(promptId: string): Promise<boolean>
  */
 export async function resolveDiscussionPrompt(promptId: string): Promise<DiscussionPrompt | null> {
   // First get current responses
-  const { data: responses, error: responseError } = await supabase
+  const { data: responses, error: responseError } = await (supabase as any)
     .from('squad_chat')
     .select('agent_name, message, is_human, created_at')
-    .eq('discussion_prompt_id' as any, promptId)
-    .eq('message_type' as any, 'discussion_response')
+    .eq('discussion_prompt_id', promptId)
+    .eq('message_type', 'discussion_response')
     .order('created_at', { ascending: true })
   
   if (responseError) {
@@ -605,7 +606,7 @@ export async function resolveDiscussionPrompt(promptId: string): Promise<Discuss
     return null
   }
   
-  const collectedContext = (responses || []).map(r => ({
+  const collectedContext = (responses || []).map((r: { agent_name: string; message: string; is_human?: boolean; created_at: string }) => ({
     agent: r.agent_name,
     message: r.message,
     is_human: r.is_human || false,
@@ -634,11 +635,11 @@ export async function resolveDiscussionPrompt(promptId: string): Promise<Discuss
  * Get responses for a discussion prompt
  */
 export async function getDiscussionResponses(promptId: string): Promise<SquadChat[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('squad_chat')
     .select('*')
-    .eq('discussion_prompt_id' as any, promptId)
-    .eq('message_type' as any, 'discussion_response')
+    .eq('discussion_prompt_id', promptId)
+    .eq('message_type', 'discussion_response')
     .order('created_at', { ascending: true })
   
   if (error) {
