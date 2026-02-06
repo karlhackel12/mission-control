@@ -4,14 +4,7 @@ import { useState } from 'react'
 import { X, CheckSquare, ExternalLink, Twitter, FileText, TicketIcon, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter
-} from '@/components/ui/dialog'
+// Dialog imports removed - using inline feedback field
 import { PRODUCTS, PRIORITY_COLORS, BADGE_COLORS } from '@/lib/constants'
 import { formatDistanceToNow, format } from 'date-fns'
 import type { Agent } from '@/lib/supabase/queries'
@@ -52,7 +45,6 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskDetailModalProps) {
-  const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [rejectionNote, setRejectionNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -64,7 +56,6 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
     setIsSubmitting(true)
     await onStatusChange?.(task.id, 'in_progress', rejectionNote)
     setIsSubmitting(false)
-    setShowRejectDialog(false)
     setRejectionNote('')
   }
 
@@ -416,22 +407,33 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
                   </>
                 )}
                 {task.status === 'review' && (
-                  <>
+                  <div className="w-full space-y-3">
                     <button 
                       onClick={handleApprove}
                       disabled={isSubmitting}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                      className="w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
                       ✓ Approve & Close
                     </button>
-                    <button 
-                      onClick={() => setShowRejectDialog(true)}
-                      disabled={isSubmitting}
-                      className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                      Request Changes
-                    </button>
-                  </>
+                    <div className="border-t border-gray-200 pt-3">
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                        Request Changes
+                      </label>
+                      <textarea
+                        value={rejectionNote}
+                        onChange={(e) => setRejectionNote(e.target.value)}
+                        placeholder="Descreva as mudanças necessárias..."
+                        className="w-full h-20 p-3 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                      <button
+                        onClick={handleReject}
+                        disabled={!rejectionNote.trim() || isSubmitting}
+                        className="mt-2 w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSubmitting ? 'Enviando...' : 'Enviar Feedback'}
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {task.status === 'inbox' && (
                   <button 
@@ -463,44 +465,6 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
         </ScrollArea>
       </div>
 
-      {/* Rejection Dialog */}
-      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle>Request Changes</DialogTitle>
-            <DialogDescription>
-              Explain what changes are needed. This will be sent to the assignee.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <textarea
-              value={rejectionNote}
-              onChange={(e) => setRejectionNote(e.target.value)}
-              placeholder="Describe the changes needed..."
-              className="w-full h-32 p-3 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <button
-              onClick={() => {
-                setShowRejectDialog(false)
-                setRejectionNote('')
-              }}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleReject}
-              disabled={!rejectionNote.trim() || isSubmitting}
-              className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Sending...' : 'Send Feedback'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
