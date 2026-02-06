@@ -151,13 +151,32 @@ export const listWithAgents = query({
   },
 });
 
+// Internal cron job name patterns to filter
+const INTERNAL_CRON_PATTERNS = [
+  /mc\s*cron/i,
+  /mission\s*control/i,
+  /gateway\s*health/i,
+  /heartbeat/i,
+  /sync.*cron/i,
+  /health\s*check/i,
+  /infra/i,
+];
+
+// Check if a cron job is internal/infrastructure
+function isInternalCron(name: string): boolean {
+  return INTERNAL_CRON_PATTERNS.some((pattern) => pattern.test(name));
+}
+
 // List cron jobs for a specific week (calendar view)
 export const listByWeek = query({
   args: {
     weekStartMs: v.number(),
     weekEndMs: v.number(),
+    includeInternal: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const includeInternal = args.includeInternal ?? false;
+    
     // Get all active cron jobs
     const allJobs = await ctx.db
       .query("cronJobs")
@@ -170,11 +189,17 @@ export const listByWeek = query({
     // Filter jobs that have a run in this week range
     // For recurring jobs, we need to calculate all occurrences in the week
     const jobsWithOccurrences = allJobs
-      .filter((job) => job.isActive)
+      .filter((job) => {
+        if (!job.isActive) return false;
+        // Filter out internal crons unless explicitly included
+        if (!includeInternal && isInternalCron(job.name)) return false;
+        return true;
+      })
       .map((job) => {
         const agent = job.agentId ? agentMap.get(job.agentId) : null;
         return {
           ...job,
+          isInternal: isInternalCron(job.name),
           agent: agent ? {
             name: agent.name,
             emoji: agent.emoji,

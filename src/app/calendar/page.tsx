@@ -9,7 +9,9 @@ import { WeeklyCalendar } from '@/components/calendar/WeeklyCalendar'
 import { EventDetailModal } from '@/components/calendar/EventDetailModal'
 import { CronJobEvent } from '@/components/calendar/CalendarEvent'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Database, ArrowLeft, Calendar } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { RefreshCw, Database, ArrowLeft, Calendar, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -17,6 +19,7 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CronJobEvent | null>(null)
   const [isSeeding, setIsSeeding] = useState(false)
+  const [showInternal, setShowInternal] = useState(false)
   
   // Calculate week boundaries in BRT timezone
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
@@ -26,6 +29,7 @@ export default function CalendarPage() {
   const cronJobs = useQuery(api.cronJobs.listByWeek, {
     weekStartMs: weekStart.getTime(),
     weekEndMs: weekEnd.getTime(),
+    includeInternal: showInternal,
   })
   
   // Seed mutation
@@ -92,24 +96,42 @@ export default function CalendarPage() {
             : `${cronJobs.length} cron job${cronJobs.length !== 1 ? 's' : ''} configured`
           }
         </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSeedData}
-            disabled={isSeeding}
-          >
-            <Database className="w-4 h-4 mr-2" />
-            {isSeeding ? 'Seeding...' : 'Seed Demo Data'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.location.reload()}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+        <div className="flex items-center gap-4">
+          {/* Internal crons toggle */}
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-internal"
+              checked={showInternal}
+              onCheckedChange={setShowInternal}
+            />
+            <Label 
+              htmlFor="show-internal" 
+              className="text-sm text-gray-600 cursor-pointer flex items-center gap-1"
+            >
+              {showInternal ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              Internal jobs
+            </Label>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSeedData}
+              disabled={isSeeding}
+            >
+              <Database className="w-4 h-4 mr-2" />
+              {isSeeding ? 'Seeding...' : 'Seed Demo Data'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
       
