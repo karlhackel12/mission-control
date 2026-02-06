@@ -1,11 +1,21 @@
 'use client'
 
-import { X, CheckSquare, ExternalLink, Twitter, FileText, TicketIcon } from 'lucide-react'
+import { useState } from 'react'
+import { X, CheckSquare, ExternalLink, Twitter, FileText, TicketIcon, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from '@/components/ui/dialog'
 import { PRODUCTS, PRIORITY_COLORS, BADGE_COLORS } from '@/lib/constants'
 import { formatDistanceToNow, format } from 'date-fns'
 import type { Agent } from '@/lib/supabase/queries'
+import { TaskHistory } from './task-history'
 
 interface LinkedRef {
   type: 'twitter' | 'doc' | 'jira' | string
@@ -31,18 +41,38 @@ interface Task {
   linked_refs?: LinkedRef[] | null
   completion_note?: string | null
   completed_at?: string | null
+  error_message?: string | null
 }
 
 interface TaskDetailModalProps {
   task: Task
   agents: Agent[]
   onClose: () => void
-  onStatusChange?: (taskId: string, newStatus: string) => void
+  onStatusChange?: (taskId: string, newStatus: string, rejectionNote?: string) => void
 }
 
 export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskDetailModalProps) {
+  const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [rejectionNote, setRejectionNote] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
   const product = PRODUCTS.find(p => p.id === task.product_id)
   const assignee = task.assignee_id ? agents.find(a => a.id === task.assignee_id) : null
+
+  const handleReject = async () => {
+    if (!rejectionNote.trim()) return
+    setIsSubmitting(true)
+    await onStatusChange?.(task.id, 'in_progress', rejectionNote)
+    setIsSubmitting(false)
+    setShowRejectDialog(false)
+    setRejectionNote('')
+  }
+
+  const handleApprove = async () => {
+    setIsSubmitting(true)
+    await onStatusChange?.(task.id, 'done')
+    setIsSubmitting(false)
+  }
 
   const statusColors: Record<string, string> = {
     inbox: 'bg-amber-100 text-amber-700',
@@ -50,6 +80,7 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
     in_progress: 'bg-purple-100 text-purple-700',
     review: 'bg-orange-100 text-orange-700',
     done: 'bg-green-100 text-green-700',
+    failed: 'bg-red-100 text-red-700',
   }
 
   const statusLabels: Record<string, string> = {
@@ -58,7 +89,10 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
     in_progress: 'IN PROGRESS',
     review: 'REVIEW',
     done: 'DONE',
+    failed: 'FAILED',
   }
+  
+  const hasError = task.status === 'failed' || task.error_message
 
   const getRefIcon = (type: string) => {
     switch (type) {
@@ -150,6 +184,23 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
               </div>
             )}
             
+            {/* Error Message Section */}
+            {hasError && (
+              <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 text-red-700 mb-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  <h3 className="font-semibold">
+                    {task.status === 'failed' ? 'Task Failed' : 'Error Occurred'}
+                  </h3>
+                </div>
+                {task.error_message && (
+                  <p className="text-sm text-red-600 font-mono bg-red-100 p-2 rounded">
+                    {task.error_message}
+                  </p>
+                )}
+              </div>
+            )}
+            
             {/* Description Section */}
             <div className="mb-6">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -233,6 +284,32 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
               )}
             </div>
             
+            {/* Deliverable Summary - shown when agent submits for review */}
+            {task.completion_note && (
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Deliverable Summary
+                </h3>
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckSquare className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                        {task.completion_note}
+                      </p>
+                      {task.completed_at && (
+                        <p className="mt-2 text-xs text-gray-500">
+                          Submitted {formatDistanceToNow(new Date(task.completed_at), { addSuffix: true })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Context Section */}
             <div className="mb-6">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -261,13 +338,19 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
                   </div>
                 )}
                 
-                {task.completion_note && (
-                  <p className="text-sm text-gray-700">{task.completion_note}</p>
-                )}
-                
                 {task.context && (
                   <p className="text-sm text-gray-600">{task.context}</p>
                 )}
+              </div>
+            </div>
+
+            {/* Task History */}
+            <div className="mb-6">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                History
+              </h3>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                <TaskHistory taskId={task.id} />
               </div>
             </div>
 
@@ -314,17 +397,37 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
             {/* Actions */}
             {task.status !== 'done' && (
               <div className="flex gap-3 pt-4 border-t border-gray-100">
+                {task.status === 'failed' && (
+                  <>
+                    <button 
+                      onClick={() => onStatusChange?.(task.id, 'in_progress')}
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
+                    >
+                      ↻ Retry Task
+                    </button>
+                    <button 
+                      onClick={() => onStatusChange?.(task.id, 'review')}
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      Move to Review
+                    </button>
+                  </>
+                )}
                 {task.status === 'review' && (
                   <>
                     <button 
-                      onClick={() => onStatusChange?.(task.id, 'done')}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                      onClick={handleApprove}
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
                       ✓ Approve & Close
                     </button>
                     <button 
-                      onClick={() => onStatusChange?.(task.id, 'in_progress')}
-                      className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                      onClick={() => setShowRejectDialog(true)}
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
                     >
                       Request Changes
                     </button>
@@ -359,6 +462,45 @@ export function TaskDetailModal({ task, agents, onClose, onStatusChange }: TaskD
           </div>
         </ScrollArea>
       </div>
+
+      {/* Rejection Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>Request Changes</DialogTitle>
+            <DialogDescription>
+              Explain what changes are needed. This will be sent to the assignee.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <textarea
+              value={rejectionNote}
+              onChange={(e) => setRejectionNote(e.target.value)}
+              placeholder="Describe the changes needed..."
+              className="w-full h-32 p-3 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setShowRejectDialog(false)
+                setRejectionNote('')
+              }}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={!rejectionNote.trim() || isSubmitting}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Sending...' : 'Send Feedback'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
