@@ -11,8 +11,12 @@
 import type * as activities from "../activities.js";
 import type * as agents from "../agents.js";
 import type * as cronJobs from "../cronJobs.js";
+import type * as http from "../http.js";
 import type * as memories from "../memories.js";
 import type * as messages from "../messages.js";
+import type * as search from "../search.js";
+import type * as seed from "../seed.js";
+import type * as sync from "../sync.js";
 import type * as tasks from "../tasks.js";
 
 import type {
@@ -25,8 +29,12 @@ declare const fullApi: ApiFromModules<{
   activities: typeof activities;
   agents: typeof agents;
   cronJobs: typeof cronJobs;
+  http: typeof http;
   memories: typeof memories;
   messages: typeof messages;
+  search: typeof search;
+  seed: typeof seed;
+  sync: typeof sync;
   tasks: typeof tasks;
 }>;
 

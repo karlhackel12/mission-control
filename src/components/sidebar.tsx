@@ -9,11 +9,16 @@ import {
   MessageSquare, 
   Clock, 
   Settings,
-  Rocket
+  Rocket,
+  Calendar,
+  Activity
 } from 'lucide-react'
+import { GlobalSearch } from './global-search'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Activity Feed', href: '/activity', icon: Activity },
+  { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Boards', href: '/boards', icon: Kanban },
   { name: 'Squad Chat', href: '/chat', icon: MessageSquare },
   { name: 'Cron Monitor', href: '/crons', icon: Clock },
@@ -33,6 +38,11 @@ export function Sidebar() {
             <h1 className="font-bold text-lg text-gray-900">Mission Control</h1>
             <p className="text-xs text-gray-500">AI Squad Dashboard</p>
           </div>
+        </div>
+
+        {/* Global Search */}
+        <div className="px-4 py-3 border-b border-gray-100">
+          <GlobalSearch />
         </div>
 
         {/* Navigation */}

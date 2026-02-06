@@ -84,6 +84,42 @@ export const sync = mutation({
   },
 });
 
+// List cron jobs for a specific week (calendar view)
+export const listByWeek = query({
+  args: {
+    weekStartMs: v.number(),
+    weekEndMs: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Get all active cron jobs
+    const allJobs = await ctx.db
+      .query("cronJobs")
+      .collect();
+    
+    // Get agents for enrichment
+    const agents = await ctx.db.query("agents").collect();
+    const agentMap = new Map(agents.map((a) => [a._id, a]));
+    
+    // Filter jobs that have a run in this week range
+    // For recurring jobs, we need to calculate all occurrences in the week
+    const jobsWithOccurrences = allJobs
+      .filter((job) => job.isActive)
+      .map((job) => {
+        const agent = job.agentId ? agentMap.get(job.agentId) : null;
+        return {
+          ...job,
+          agent: agent ? {
+            name: agent.name,
+            emoji: agent.emoji,
+            color: agent.color,
+          } : null,
+        };
+      });
+    
+    return jobsWithOccurrences;
+  },
+});
+
 // Update cron job status after run
 export const updateStatus = mutation({
   args: {
