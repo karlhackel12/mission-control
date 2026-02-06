@@ -17,6 +17,7 @@ import {
   ArrowRight,
   ListTodo
 } from 'lucide-react'
+import { TopNav } from '@/components/nav'
 
 export default function MissionControlPage() {
   const [mounted, setMounted] = useState(false)
@@ -109,6 +110,7 @@ export default function MissionControlPage() {
           <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <span className="text-amber-500">◇</span> MISSION CONTROL
           </h1>
+          <TopNav />
         </div>
         
         <div className="flex items-center gap-6">
