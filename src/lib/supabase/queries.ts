@@ -197,7 +197,7 @@ export async function getMessages(limit = 50): Promise<SquadChat[]> {
   const { data, error } = await supabase
     .from('squad_chat')
     .select('*')
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(limit)
   
   if (error) {
