@@ -26,14 +26,14 @@ export default function MissionControlPage() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null)
-  const [activityFilter, setActivityFilter] = useState<string>('all')
+  // const [activityFilter, setActivityFilter] = useState<string>('all') // TODO: implement filters
   
   // Data state
   const [agents, setAgents] = useState<Agent[]>([])
   const [tasks, setTasks] = useState<TaskWithRelations[]>([])
   const [activity, setActivity] = useState<AgentActivity[]>([])
   const [squadChat, setSquadChat] = useState<SquadChat[]>([])
-  const [cronJobs, setCronJobs] = useState<CronJob[]>([])
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([]) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [loading, setLoading] = useState(true)
   const [feedTab, setFeedTab] = useState<'activity' | 'chat'>('activity')
 

@@ -289,3 +289,25 @@ export type SquadChat = Database['public']['Tables']['squad_chat']['Row']
 export type CronJob = Database['public']['Tables']['cron_jobs']['Row']
 export type CronRun = Database['public']['Tables']['cron_runs']['Row']
 export type Integration = Database['public']['Tables']['integrations']['Row']
+
+// New tables
+export type Document = {
+  id: string
+  title: string
+  content: string | null
+  type: 'deliverable' | 'research' | 'protocol' | 'report' | 'other'
+  task_id: string | null
+  agent_name: string
+  file_path: string | null
+  created_at: string
+}
+
+export type Notification = {
+  id: string
+  mentioned_agent: string
+  from_agent: string
+  content: string
+  task_id: string | null
+  delivered: boolean
+  created_at: string
+}

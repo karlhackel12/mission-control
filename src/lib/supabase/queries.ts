@@ -2,7 +2,7 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import type { Task, Product, AgentActivity, SquadChat, CronJob, CronRun, Agent as AgentType, Database } from './types'
+import type { Task, Product, AgentActivity, SquadChat, CronJob, CronRun, Agent as AgentType, Database, Document, Notification } from './types'
 
 export type TaskInsert = Database['public']['Tables']['tasks']['Insert']
 export type TaskUpdate = Database['public']['Tables']['tasks']['Update']
@@ -264,4 +264,105 @@ export async function getDashboardStats() {
     totalAgents: agents.length,
     recentActivity: activity
   }
+}
+
+// ============ DOCUMENTS ============
+
+export async function getDocuments(limit = 20): Promise<Document[]> {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  
+  if (error) {
+    console.error('Error fetching documents:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function getDocumentsByTask(taskId: string): Promise<Document[]> {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+  
+  if (error) {
+    console.error('Error fetching documents:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function createDocument(doc: Omit<Document, 'id' | 'created_at'>): Promise<Document | null> {
+  const { data, error } = await supabase
+    .from('documents')
+    .insert(doc)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error creating document:', error)
+    return null
+  }
+  return data
+}
+
+// ============ NOTIFICATIONS ============
+export async function getNotifications(agentName?: string): Promise<Notification[]> {
+  let query = supabase
+    .from('notifications')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (agentName) {
+    query = query.eq('mentioned_agent', agentName)
+  }
+  
+  const { data, error } = await query
+  
+  if (error) {
+    console.error('Error fetching notifications:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function getUndeliveredNotifications(): Promise<Notification[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('delivered', false)
+    .order('created_at', { ascending: true })
+  
+  if (error) {
+    console.error('Error fetching notifications:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function markNotificationDelivered(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ delivered: true })
+    .eq('id', id)
+  
+  return !error
+}
+
+export async function createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'delivered'>): Promise<Notification | null> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert({ ...notification, delivered: false })
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error creating notification:', error)
+    return null
+  }
+  return data
 }
