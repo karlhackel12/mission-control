@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -14,9 +14,98 @@ import {
   AlertTriangle,
   Plus,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react'
 import { Doc, Id } from '../../../convex/_generated/dataModel'
+
+/**
+ * Regex to match URLs in text
+ */
+const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+
+/**
+ * Parse text and convert URLs to clickable links
+ */
+function parseTextWithLinks(text: string): React.ReactNode {
+  const parts = text.split(URL_REGEX);
+  
+  return parts.map((part, index) => {
+    if (URL_REGEX.test(part)) {
+      // Reset regex lastIndex
+      URL_REGEX.lastIndex = 0;
+      
+      // Extract domain for display
+      let displayUrl = part;
+      try {
+        const url = new URL(part);
+        displayUrl = url.hostname + (url.pathname !== '/' ? url.pathname.slice(0, 30) + (url.pathname.length > 30 ? '...' : '') : '');
+      } catch {
+        displayUrl = part.slice(0, 40) + (part.length > 40 ? '...' : '');
+      }
+      
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline break-all"
+        >
+          {displayUrl}
+          <ExternalLink className="w-3 h-3 inline shrink-0" />
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
+/**
+ * Parse metadata and make URLs clickable
+ */
+function renderMetadataValue(value: any, depth = 0): React.ReactNode {
+  if (depth > 5) return JSON.stringify(value);
+  
+  if (typeof value === 'string') {
+    if (URL_REGEX.test(value)) {
+      URL_REGEX.lastIndex = 0;
+      return parseTextWithLinks(value);
+    }
+    return value;
+  }
+  
+  if (Array.isArray(value)) {
+    return (
+      <span className="text-gray-600">
+        [{value.map((v, i) => (
+          <span key={i}>
+            {i > 0 && ', '}
+            {renderMetadataValue(v, depth + 1)}
+          </span>
+        ))}]
+      </span>
+    );
+  }
+  
+  if (typeof value === 'object' && value !== null) {
+    return (
+      <span className="text-gray-700">
+        {'{'}
+        {Object.entries(value).map(([k, v], i) => (
+          <span key={k} className="ml-2">
+            {i > 0 && ', '}
+            <span className="text-purple-600">{k}</span>: {renderMetadataValue(v, depth + 1)}
+          </span>
+        ))}
+        {'}'}
+      </span>
+    );
+  }
+  
+  return String(value);
+}
 
 // Type icons mapping
 const TYPE_ICONS: Record<string, React.ElementType> = {
@@ -100,7 +189,9 @@ export function ActivityItem({ activity, agent, compact = false }: ActivityItemP
             <span className="text-xs text-gray-500">{activity.action}</span>
           </div>
           {activity.details && (
-            <p className="text-xs text-gray-600 truncate">{activity.details}</p>
+            <p className="text-xs text-gray-600 truncate">
+              {parseTextWithLinks(activity.details)}
+            </p>
           )}
         </div>
         <span className="text-[10px] text-gray-400 whitespace-nowrap">
@@ -158,13 +249,13 @@ export function ActivityItem({ activity, agent, compact = false }: ActivityItemP
               </span>
             </div>
             
-            {/* Details */}
+            {/* Details - with clickable links */}
             {activity.details && (
               <p className={cn(
                 "text-sm mt-2",
                 isError ? "text-red-600" : "text-gray-600"
               )}>
-                {activity.details}
+                {parseTextWithLinks(activity.details)}
               </p>
             )}
             
@@ -183,14 +274,20 @@ export function ActivityItem({ activity, agent, compact = false }: ActivityItemP
         </div>
       </div>
       
-      {/* Expanded metadata */}
+      {/* Expanded metadata - with clickable links */}
       {expanded && hasMetadata && (
         <div className="px-4 pb-4 pt-0">
           <div className="bg-gray-50 rounded-lg p-3 ml-13">
             <p className="text-xs font-medium text-gray-500 mb-2">Metadata</p>
-            <pre className="text-xs text-gray-700 overflow-x-auto">
-              {JSON.stringify(activity.metadata, null, 2)}
-            </pre>
+            <div className="text-xs text-gray-700 overflow-x-auto font-mono whitespace-pre-wrap">
+              {Object.entries(activity.metadata).map(([key, value]) => (
+                <div key={key} className="py-1">
+                  <span className="text-purple-600 font-semibold">{key}</span>
+                  <span className="text-gray-400">: </span>
+                  {renderMetadataValue(value)}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
