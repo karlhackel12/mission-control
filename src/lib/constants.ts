@@ -10,10 +10,10 @@ export const AGENTS = [
 ] as const
 
 export const PRODUCTS = [
-  { id: 'golance', name: 'goLance', emoji: '🚀', color: '#3B82F6', shortName: 'GL' },
-  { id: 'transforce', name: 'TransForce', emoji: '🚚', color: '#F97316', shortName: 'TF' },
-  { id: 'hellopeople', name: 'HelloPeople', emoji: '👋', color: '#10B981', shortName: 'HP' },
-  { id: 'manuai', name: 'Manuai', emoji: '🤖', color: '#8B5CF6', shortName: 'MA' },
+  { id: '11111111-1111-1111-1111-111111111111', name: 'goLance', emoji: '🚀', color: '#3B82F6', shortName: 'GL' },
+  { id: '22222222-2222-2222-2222-222222222222', name: 'TransForce', emoji: '🚚', color: '#F97316', shortName: 'TF' },
+  { id: '33333333-3333-3333-3333-333333333333', name: 'HelloPeople', emoji: '👋', color: '#10B981', shortName: 'HP' },
+  { id: '44444444-4444-4444-4444-444444444444', name: 'Manuai', emoji: '🤖', color: '#8B5CF6', shortName: 'MA' },
 ] as const
 
 export const TASK_STATUSES = ['inbox', 'assigned', 'in_progress', 'review', 'done'] as const
