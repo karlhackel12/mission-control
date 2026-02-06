@@ -170,6 +170,8 @@ export type Database = {
           agent_name: string
           message: string
           task_ref: string | null
+          reply_to_id: string | null
+          is_human: boolean
           created_at: string
         }
         Insert: {
@@ -177,6 +179,8 @@ export type Database = {
           agent_name: string
           message: string
           task_ref?: string | null
+          reply_to_id?: string | null
+          is_human?: boolean
           created_at?: string
         }
         Update: {
@@ -184,6 +188,8 @@ export type Database = {
           agent_name?: string
           message?: string
           task_ref?: string | null
+          reply_to_id?: string | null
+          is_human?: boolean
           created_at?: string
         }
       }
@@ -195,6 +201,8 @@ export type Database = {
           description: string | null
           enabled: boolean
           last_run: string | null
+          product_id: string | null
+          agent_id: string | null
           created_at: string
         }
         Insert: {
@@ -204,6 +212,8 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           last_run?: string | null
+          product_id?: string | null
+          agent_id?: string | null
           created_at?: string
         }
         Update: {
@@ -213,6 +223,8 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           last_run?: string | null
+          product_id?: string | null
+          agent_id?: string | null
           created_at?: string
         }
       }
@@ -286,8 +298,7 @@ export type Product = Database['public']['Tables']['products']['Row']
 export type Task = Database['public']['Tables']['tasks']['Row']
 export type AgentActivity = Database['public']['Tables']['agent_activity']['Row']
 export type SquadChat = Database['public']['Tables']['squad_chat']['Row']
-export type CronJobBase = Database['public']['Tables']['cron_jobs']['Row']
-export type CronJob = CronJobBase & { product_id?: string | null }
+export type CronJob = Database['public']['Tables']['cron_jobs']['Row']
 export type CronRun = Database['public']['Tables']['cron_runs']['Row']
 export type Integration = Database['public']['Tables']['integrations']['Row']
 

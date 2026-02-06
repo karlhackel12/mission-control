@@ -63,7 +63,12 @@ export default function MissionControlPage() {
     setMounted(true)
     fetchData()
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
+    // Auto-refresh data every 10 seconds
+    const refreshTimer = setInterval(() => fetchData(), 10000)
+    return () => {
+      clearInterval(timer)
+      clearInterval(refreshTimer)
+    }
   }, [fetchData])
 
   // Handle task status change
