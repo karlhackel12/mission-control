@@ -192,6 +192,9 @@ export async function getMessages(limit = 50): Promise<SquadChat[]> {
   return data || []
 }
 
+// Alias for clarity
+export const getSquadChat = (limit = 20) => getMessages(limit)
+
 export async function sendMessage(message: ChatInsert): Promise<SquadChat | null> {
   const { data, error } = await supabase
     .from('squad_chat')

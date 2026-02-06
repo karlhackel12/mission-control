@@ -9,13 +9,15 @@ import { TaskDetailModal } from '@/components/task-detail-modal'
 import { 
   getAgents, 
   getTasks, 
-  getActivity, 
+  getActivity,
+  getSquadChat,
+  getCronJobs,
   updateTask,
   type Agent,
   type TaskWithRelations,
   type TaskUpdate
 } from '@/lib/supabase/queries'
-import type { AgentActivity } from '@/lib/supabase/types'
+import type { AgentActivity, SquadChat, CronJob } from '@/lib/supabase/types'
 
 type TaskStatus = 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
 
@@ -30,19 +32,26 @@ export default function MissionControlPage() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [tasks, setTasks] = useState<TaskWithRelations[]>([])
   const [activity, setActivity] = useState<AgentActivity[]>([])
+  const [squadChat, setSquadChat] = useState<SquadChat[]>([])
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([])
   const [loading, setLoading] = useState(true)
+  const [feedTab, setFeedTab] = useState<'activity' | 'chat'>('activity')
 
   // Fetch data from Supabase
   const fetchData = useCallback(async () => {
     try {
-      const [agentsData, tasksData, activityData] = await Promise.all([
+      const [agentsData, tasksData, activityData, chatData, cronData] = await Promise.all([
         getAgents(),
         getTasks(),
-        getActivity(20)
+        getActivity(20),
+        getSquadChat(20),
+        getCronJobs()
       ])
       setAgents(agentsData)
       setTasks(tasksData)
       setActivity(activityData)
+      setSquadChat(chatData)
+      setCronJobs(cronData)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -174,7 +183,7 @@ export default function MissionControlPage() {
                 </div>
                 <div className="text-left">
                   <p className="font-medium text-gray-900">All Agents</p>
-                  <p className="text-xs text-green-600">{activeAgentIds.size} ACTIVE</p>
+                  <p className="text-xs text-green-600">{activeAgentIds.size} WITH TASKS</p>
                 </div>
               </button>
               
@@ -356,22 +365,29 @@ export default function MissionControlPage() {
             </div>
           </div>
           
-          {/* Filters */}
+          {/* Tabs: Activity | Chat */}
           <div className="p-3 border-b border-gray-100">
-            <div className="flex flex-wrap gap-1">
-              {['all', 'tasks', 'comments', 'decisions', 'status'].map(filter => (
-                <button
-                  key={filter}
-                  onClick={() => setActivityFilter(filter)}
-                  className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                    activityFilter === filter 
-                      ? 'bg-amber-100 text-amber-700' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                </button>
-              ))}
+            <div className="flex gap-1">
+              <button
+                onClick={() => setFeedTab('activity')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  feedTab === 'activity' 
+                    ? 'bg-amber-100 text-amber-700' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                📊 Activity ({activity.length})
+              </button>
+              <button
+                onClick={() => setFeedTab('chat')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  feedTab === 'chat' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                💬 Squad Chat ({squadChat.length})
+              </button>
             </div>
             
             {/* Agent Filter */}
@@ -389,39 +405,73 @@ export default function MissionControlPage() {
             </div>
           </div>
           
-          {/* Activity Stream */}
+          {/* Feed Content */}
           <ScrollArea className="h-[calc(100vh-14rem)]">
             <div className="p-3 space-y-3">
-              {activity.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  No activity yet
-                </div>
+              {feedTab === 'activity' ? (
+                /* Activity Stream */
+                activity.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    No activity yet
+                  </div>
+                ) : (
+                  activity.map(item => {
+                    const agent = agents.find(a => a.name === item.agent_name)
+                    return (
+                      <div key={item.id} className="flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                        <div 
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+                          style={{ backgroundColor: agent ? `${agent.color}20` : '#f3f4f6' }}
+                        >
+                          {agent?.emoji || '🤖'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900">
+                            <span className="font-medium">{item.agent_name}</span>
+                            <span className="text-gray-500"> {item.action}</span>
+                          </p>
+                          {item.content && (
+                            <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{item.content}</p>
+                          )}
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })
+                )
               ) : (
-                activity.map(item => {
-                  const agent = agents.find(a => a.name === item.agent_name)
-                  return (
-                    <div key={item.id} className="flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                      <div 
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                        style={{ backgroundColor: agent ? `${agent.color}20` : '#f3f4f6' }}
-                      >
-                        {agent?.emoji || '🤖'}
+                /* Squad Chat */
+                squadChat.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    No messages yet
+                  </div>
+                ) : (
+                  squadChat.map(msg => {
+                    const agent = agents.find(a => a.name === msg.agent_name)
+                    return (
+                      <div key={msg.id} className="flex gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                        <div 
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+                          style={{ backgroundColor: agent ? `${agent.color}20` : '#f3f4f6' }}
+                        >
+                          {agent?.emoji || '🤖'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{msg.agent_name}</p>
+                          <p className="text-sm text-gray-700 mt-0.5">{msg.message}</p>
+                          {msg.task_ref && (
+                            <p className="text-[10px] text-blue-500 mt-1">📎 Task: {msg.task_ref}</p>
+                          )}
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900">
-                          <span className="font-medium">{item.agent_name}</span>
-                          <span className="text-gray-500"> {item.action}</span>
-                        </p>
-                        {item.content && (
-                          <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{item.content}</p>
-                        )}
-                        <p className="text-[10px] text-gray-400 mt-0.5">
-                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })
+                    )
+                  })
+                )
               )}
             </div>
           </ScrollArea>
