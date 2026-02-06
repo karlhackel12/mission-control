@@ -126,4 +126,59 @@ export default defineSchema({
       dimensions: 1536, // OpenAI ada-002
       filterFields: ["category"],
     }),
+
+  // Sessions table - synced from OpenClaw gateway
+  sessions: defineTable({
+    sessionId: v.string(), // OpenClaw session ID (e.g., "agent:main:main")
+    agentId: v.optional(v.id("agents")),
+    agentName: v.string(), // OpenClaw agent name
+    channel: v.optional(v.string()), // "whatsapp", "discord", "telegram", etc.
+    status: v.union(
+      v.literal("active"),
+      v.literal("idle"),
+      v.literal("sleeping"),
+      v.literal("terminated")
+    ),
+    model: v.optional(v.string()), // Current model being used
+    lastActivityAt: v.number(),
+    startedAt: v.number(),
+    metadata: v.optional(v.any()), // Extra session info
+  })
+    .index("by_session_id", ["sessionId"])
+    .index("by_agent", ["agentId"])
+    .index("by_agent_name", ["agentName"])
+    .index("by_status", ["status"])
+    .index("by_last_activity", ["lastActivityAt"]),
+
+  // Recurring tasks table - for task queue with retry support
+  recurringTasks: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    schedule: v.string(), // cron expression
+    agentId: v.optional(v.id("agents")),
+    payload: v.optional(v.any()),
+    status: v.union(
+      v.literal("active"),
+      v.literal("paused"),
+      v.literal("failed"),
+      v.literal("completed")
+    ),
+    retryCount: v.number(),
+    maxRetries: v.number(),
+    lastRunAt: v.optional(v.number()),
+    lastStatus: v.optional(v.union(
+      v.literal("success"),
+      v.literal("failure"),
+      v.literal("running"),
+      v.literal("skipped")
+    )),
+    lastError: v.optional(v.string()),
+    nextRunAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_agent", ["agentId"])
+    .index("by_next_run", ["nextRunAt"])
+    .index("by_name", ["name"]),
 });

@@ -3,6 +3,10 @@ import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
+// Valid session statuses
+const SESSION_STATUSES = ["active", "idle", "sleeping", "terminated"] as const;
+type SessionStatus = typeof SESSION_STATUSES[number];
+
 const http = httpRouter();
 
 // POST /activity - receive activity logs from OpenClaw
@@ -125,6 +129,158 @@ http.route({
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }),
+});
+
+// ============================================
+// SESSION ENDPOINTS
+// ============================================
+
+// POST /session - upsert session from OpenClaw
+http.route({
+  path: "/session",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      const { sessionId, agentName, channel, status, model, metadata } = body;
+
+      // Validate required fields
+      if (!sessionId || !agentName) {
+        return new Response(
+          JSON.stringify({ error: "Missing required fields: sessionId, agentName" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate status
+      const validStatus: SessionStatus = SESSION_STATUSES.includes(status) ? status : "active";
+
+      const id = await ctx.runMutation(internal.sessions.upsertInternal, {
+        sessionId,
+        agentName,
+        channel: channel || undefined,
+        status: validStatus,
+        model: model || undefined,
+        metadata: metadata || undefined,
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, id }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error upserting session:", error);
+      return new Response(
+        JSON.stringify({ error: "Internal server error" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }),
+});
+
+// GET /session - list sessions or get by ID
+http.route({
+  path: "/session",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const url = new URL(request.url);
+      const sessionId = url.searchParams.get("sessionId");
+      const status = url.searchParams.get("status") as SessionStatus | null;
+      const limit = parseInt(url.searchParams.get("limit") || "20", 10);
+
+      if (sessionId) {
+        const session = await ctx.runQuery(api.sessions.getBySessionId, { sessionId });
+        return new Response(
+          JSON.stringify(session || { error: "Session not found" }),
+          { 
+            status: session ? 200 : 404, 
+            headers: { "Content-Type": "application/json" } 
+          }
+        );
+      }
+
+      const sessions = await ctx.runQuery(api.sessions.list, { 
+        status: SESSION_STATUSES.includes(status as any) ? status as SessionStatus : undefined,
+        limit 
+      });
+
+      return new Response(
+        JSON.stringify({ sessions }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      return new Response(
+        JSON.stringify({ error: "Internal server error" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }),
+});
+
+// POST /session/heartbeat - update session heartbeat
+http.route({
+  path: "/session/heartbeat",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      const { sessionId } = body;
+
+      if (!sessionId) {
+        return new Response(
+          JSON.stringify({ error: "Missing required field: sessionId" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      const id = await ctx.runMutation(api.sessions.heartbeat, { sessionId });
+
+      return new Response(
+        JSON.stringify({ success: true, id }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error updating heartbeat:", error);
+      return new Response(
+        JSON.stringify({ error: "Internal server error" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }),
+});
+
+// CORS preflight for /session
+http.route({
+  path: "/session",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }),
+});
+
+// CORS preflight for /session/heartbeat
+http.route({
+  path: "/session/heartbeat",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       },
     });
