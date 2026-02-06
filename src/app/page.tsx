@@ -33,9 +33,9 @@ export default function MissionControlPage() {
   const [tasks, setTasks] = useState<TaskWithRelations[]>([])
   const [activity, setActivity] = useState<AgentActivity[]>([])
   const [squadChat, setSquadChat] = useState<SquadChat[]>([])
-  const [cronJobs, setCronJobs] = useState<CronJob[]>([]) // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([])
   const [loading, setLoading] = useState(true)
-  const [feedTab, setFeedTab] = useState<'activity' | 'chat'>('activity')
+  const [feedTab, setFeedTab] = useState<'activity' | 'chat' | 'cron'>('activity')
 
   // Fetch data from Supabase
   const fetchData = useCallback(async () => {
@@ -370,7 +370,7 @@ export default function MissionControlPage() {
             </div>
           </div>
           
-          {/* Tabs: Activity | Chat */}
+          {/* Tabs: Activity | Chat | Cron */}
           <div className="p-3 border-b border-gray-100">
             <div className="flex gap-1">
               <button
@@ -381,7 +381,7 @@ export default function MissionControlPage() {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                📊 Activity ({activity.length})
+                📊 Activity
               </button>
               <button
                 onClick={() => setFeedTab('chat')}
@@ -391,7 +391,17 @@ export default function MissionControlPage() {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                💬 Squad Chat ({squadChat.length})
+                💬 Chat
+              </button>
+              <button
+                onClick={() => setFeedTab('cron')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  feedTab === 'cron' 
+                    ? 'bg-purple-100 text-purple-700' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                ⏰ Cron
               </button>
             </div>
             
@@ -446,7 +456,7 @@ export default function MissionControlPage() {
                     )
                   })
                 )
-              ) : (
+              ) : feedTab === 'chat' ? (
                 /* Squad Chat */
                 squadChat.length === 0 ? (
                   <div className="text-center py-8 text-gray-400 text-sm">
@@ -472,6 +482,76 @@ export default function MissionControlPage() {
                           <p className="text-[10px] text-gray-400 mt-0.5">
                             {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                           </p>
+                        </div>
+                      </div>
+                    )
+                  })
+                )
+              ) : (
+                /* Cron Jobs */
+                cronJobs.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    No cron jobs configured
+                  </div>
+                ) : (
+                  cronJobs.map(job => {
+                    const agent = job.agent_id ? agents.find(a => a.id === job.agent_id) : null
+                    return (
+                      <div 
+                        key={job.id} 
+                        className={`p-3 rounded-lg border transition-colors ${
+                          job.enabled 
+                            ? 'bg-purple-50 border-purple-200 hover:border-purple-300' 
+                            : 'bg-gray-50 border-gray-200 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${job.enabled ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                            <span className="font-medium text-sm text-gray-900">{job.name}</span>
+                          </div>
+                          {agent && (
+                            <div 
+                              className="w-6 h-6 rounded flex items-center justify-center text-xs"
+                              style={{ backgroundColor: `${agent.color}20` }}
+                              title={agent.name}
+                            >
+                              {agent.emoji}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {job.description && (
+                          <p className="text-xs text-gray-600 mb-2">{job.description}</p>
+                        )}
+                        
+                        <div className="flex flex-col gap-1 text-[11px]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500 w-16">Schedule:</span>
+                            <code className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-mono">
+                              {job.schedule}
+                            </code>
+                          </div>
+                          
+                          {job.last_run && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-500 w-16">Last run:</span>
+                              <span className="text-gray-700">
+                                {formatDistanceToNow(new Date(job.last_run), { addSuffix: true })}
+                              </span>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500 w-16">Status:</span>
+                            <span className={`px-1.5 py-0.5 rounded ${
+                              job.enabled 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-gray-200 text-gray-600'
+                            }`}>
+                              {job.enabled ? 'Active' : 'Paused'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )
