@@ -79,7 +79,7 @@ export type Database = {
           product_id: string
           title: string
           description: string | null
-          status: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+          status: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed'
           priority: 'low' | 'normal' | 'high' | 'urgent'
           assignee_type: 'agent' | 'human' | null
           assignee_id: string | null
@@ -92,6 +92,7 @@ export type Database = {
           completion_note: string | null
           completed_at: string | null
           tags: string[] | null
+          error_message: string | null
           created_at: string
           updated_at: string
         }
@@ -100,7 +101,7 @@ export type Database = {
           product_id: string
           title: string
           description?: string | null
-          status?: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+          status?: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed'
           priority?: 'low' | 'normal' | 'high' | 'urgent'
           assignee_type?: 'agent' | 'human' | null
           assignee_id?: string | null
@@ -113,6 +114,7 @@ export type Database = {
           completion_note?: string | null
           completed_at?: string | null
           tags?: string[] | null
+          error_message?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -121,7 +123,7 @@ export type Database = {
           product_id?: string
           title?: string
           description?: string | null
-          status?: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+          status?: 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed'
           priority?: 'low' | 'normal' | 'high' | 'urgent'
           assignee_type?: 'agent' | 'human' | null
           assignee_id?: string | null
@@ -134,6 +136,7 @@ export type Database = {
           completion_note?: string | null
           completed_at?: string | null
           tags?: string[] | null
+          error_message?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -172,6 +175,8 @@ export type Database = {
           task_ref: string | null
           reply_to_id: string | null
           is_human: boolean
+          discussion_prompt_id: string | null
+          message_type: 'message' | 'discussion_prompt' | 'discussion_response' | 'system'
           created_at: string
         }
         Insert: {
@@ -181,6 +186,8 @@ export type Database = {
           task_ref?: string | null
           reply_to_id?: string | null
           is_human?: boolean
+          discussion_prompt_id?: string | null
+          message_type?: 'message' | 'discussion_prompt' | 'discussion_response' | 'system'
           created_at?: string
         }
         Update: {
@@ -190,6 +197,49 @@ export type Database = {
           task_ref?: string | null
           reply_to_id?: string | null
           is_human?: boolean
+          discussion_prompt_id?: string | null
+          message_type?: 'message' | 'discussion_prompt' | 'discussion_response' | 'system'
+          created_at?: string
+        }
+      }
+      discussion_prompts: {
+        Row: {
+          id: string
+          task_id: string | null
+          requester_agent: string
+          prompt_message: string
+          required_responses: number
+          timeout_minutes: number
+          status: 'pending' | 'collecting' | 'resolved' | 'timed_out' | 'cancelled'
+          collected_context: object[]
+          squad_chat_id: string | null
+          resolved_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id?: string | null
+          requester_agent: string
+          prompt_message: string
+          required_responses?: number
+          timeout_minutes?: number
+          status?: 'pending' | 'collecting' | 'resolved' | 'timed_out' | 'cancelled'
+          collected_context?: object[]
+          squad_chat_id?: string | null
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string | null
+          requester_agent?: string
+          prompt_message?: string
+          required_responses?: number
+          timeout_minutes?: number
+          status?: 'pending' | 'collecting' | 'resolved' | 'timed_out' | 'cancelled'
+          collected_context?: object[]
+          squad_chat_id?: string | null
+          resolved_at?: string | null
           created_at?: string
         }
       }
@@ -322,4 +372,35 @@ export type Notification = {
   task_id: string | null
   delivered: boolean
   created_at: string
+}
+
+// Discussion Prompts - for agent collaboration before task execution
+export type DiscussionPromptStatus = 'pending' | 'collecting' | 'resolved' | 'timed_out' | 'cancelled'
+export type MessageType = 'message' | 'discussion_prompt' | 'discussion_response' | 'system'
+
+export type DiscussionPrompt = {
+  id: string
+  task_id: string | null
+  requester_agent: string
+  prompt_message: string
+  required_responses: number
+  timeout_minutes: number
+  status: DiscussionPromptStatus
+  collected_context: DiscussionResponse[]
+  squad_chat_id: string | null
+  resolved_at: string | null
+  created_at: string
+}
+
+export type DiscussionResponse = {
+  agent: string
+  message: string
+  is_human: boolean
+  created_at: string
+}
+
+// Extended SquadChat with discussion support
+export type SquadChatExtended = SquadChat & {
+  discussion_prompt_id?: string | null
+  message_type?: MessageType
 }

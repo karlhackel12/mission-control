@@ -16,7 +16,7 @@ export const PRODUCTS = [
   { id: '44444444-4444-4444-4444-444444444444', name: 'Manuai', emoji: '🤖', color: '#8B5CF6', shortName: 'MA' },
 ] as const
 
-export const TASK_STATUSES = ['inbox', 'assigned', 'in_progress', 'review', 'done'] as const
+export const TASK_STATUSES = ['inbox', 'assigned', 'in_progress', 'review', 'done', 'failed'] as const
 
 export const TASK_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const
 
@@ -33,6 +33,7 @@ export const STATUS_LABELS = {
   in_progress: 'IN PROGRESS',
   review: 'REVIEW',
   done: 'DONE',
+  failed: 'FAILED',
 } as const
 
 export const STATUS_COLORS = {
@@ -41,6 +42,7 @@ export const STATUS_COLORS = {
   in_progress: '#8B5CF6',
   review: '#F97316',
   done: '#10B981',
+  failed: '#DC2626',
 } as const
 
 export const BADGE_COLORS = {

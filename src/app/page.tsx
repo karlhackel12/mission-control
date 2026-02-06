@@ -13,13 +13,15 @@ import {
   getSquadChat,
   getCronJobs,
   updateTask,
+  logActivity,
+  sendMessage,
   type Agent,
   type TaskWithRelations,
   type TaskUpdate
 } from '@/lib/supabase/queries'
 import type { AgentActivity, SquadChat, CronJob } from '@/lib/supabase/types'
 
-type TaskStatus = 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done'
+type TaskStatus = 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed'
 
 export default function MissionControlPage() {
   const [mounted, setMounted] = useState(false)
@@ -36,6 +38,7 @@ export default function MissionControlPage() {
   const [cronJobs, setCronJobs] = useState<CronJob[]>([])
   const [loading, setLoading] = useState(true)
   const [feedTab, setFeedTab] = useState<'activity' | 'chat' | 'cron'>('activity')
+  const [replyingTo, setReplyingTo] = useState<SquadChat | null>(null)
 
   // Fetch data from Supabase
   const fetchData = useCallback(async () => {
@@ -72,18 +75,57 @@ export default function MissionControlPage() {
   }, [fetchData])
 
   // Handle task status change
-  const handleStatusChange = async (taskId: string, newStatus: string) => {
+  const handleStatusChange = async (taskId: string, newStatus: string, rejectionNote?: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+    
     const updates: TaskUpdate = { 
       status: newStatus as TaskStatus
     }
+    
     if (newStatus === 'done') {
       updates.completed_at = new Date().toISOString()
     }
     
+    // Clear error_message when retrying a failed task or moving away from error state
+    if (task.status === 'failed' || task.error_message) {
+      updates.error_message = null
+    }
+    
+    // If rejecting (from review to in_progress with a note), store the feedback
+    if (rejectionNote && newStatus === 'in_progress') {
+      // Prepend rejection note to context or create new one
+      const timestamp = new Date().toLocaleString('en-US', { 
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+      })
+      const feedback = `[${timestamp}] Changes requested: ${rejectionNote}`
+      updates.context = task.context 
+        ? `${feedback}\n\n${task.context}`
+        : feedback
+    }
+    
     const updated = await updateTask(taskId, updates)
     if (updated) {
+      // Log activity for the status change
+      const actionVerb = newStatus === 'done' 
+        ? 'approved' 
+        : rejectionNote 
+          ? 'requested changes on' 
+          : `moved to ${newStatus}`
+      
+      await logActivity({
+        agent_name: 'karl', // Human reviewer
+        action: actionVerb,
+        content: rejectionNote || task.title,
+        task_id: taskId
+      })
+      
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t))
       setSelectedTask(null)
+      
+      // Refresh activity feed
+      const newActivity = await getActivity(20)
+      setActivity(newActivity)
     }
   }
 
@@ -246,7 +288,7 @@ export default function MissionControlPage() {
           
           <div className="p-4 h-[calc(100vh-8rem)] overflow-x-auto">
             <div className="flex gap-4 h-full min-w-max">
-              {(['inbox', 'assigned', 'in_progress', 'review', 'done'] as TaskStatus[]).map(status => (
+              {(['inbox', 'assigned', 'in_progress', 'review', 'failed', 'done'] as TaskStatus[]).map(status => (
                 <div key={status} className="w-72 flex flex-col bg-gray-50/50 rounded-lg shrink-0">
                   {/* Column Header */}
                   <div className="p-3 flex items-center justify-between">
@@ -271,14 +313,29 @@ export default function MissionControlPage() {
                         const product = getProductById(task.product_id)
                         const assignee = task.assignee_id ? getAgentById(task.assignee_id) : null
                         const tags = task.tags || []
+                        const hasError = task.status === 'failed' || task.error_message
                         return (
                           <div 
                             key={task.id}
                             onClick={() => setSelectedTask(task)}
-                            className="bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all"
+                            className={`bg-white rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-all ${
+                              hasError 
+                                ? 'border-red-400 border-2 bg-red-50/30 hover:border-red-500' 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
                           >
+                            {/* Error indicator */}
+                            {hasError && (
+                              <div className="flex items-center gap-1.5 text-red-600 text-xs mb-2 font-medium">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                {task.status === 'failed' ? 'FAILED' : 'ERROR'}
+                              </div>
+                            )}
+                            
                             {/* Priority indicator */}
-                            {task.priority === 'urgent' && (
+                            {!hasError && task.priority === 'urgent' && (
                               <div className="flex items-center gap-1 text-red-600 text-xs mb-2">
                                 <span>!</span> URGENT
                               </div>
@@ -457,36 +514,161 @@ export default function MissionControlPage() {
                   })
                 )
               ) : feedTab === 'chat' ? (
-                /* Squad Chat */
-                squadChat.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400 text-sm">
-                    No messages yet
-                  </div>
-                ) : (
-                  squadChat.map(msg => {
-                    const agent = agents.find(a => a.name === msg.agent_name)
-                    return (
-                      <div key={msg.id} className="flex gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors">
-                        <div 
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                          style={{ backgroundColor: agent ? `${agent.color}20` : '#f3f4f6' }}
+                /* Squad Chat with Reply Threads */
+                <>
+                  {squadChat.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">
+                      No messages yet
+                    </div>
+                  ) : (
+                    (() => {
+                      // Organize messages: parent messages first, then group replies
+                      const parentMessages = squadChat.filter(m => !m.reply_to_id)
+                      const repliesMap = squadChat
+                        .filter(m => m.reply_to_id)
+                        .reduce((acc, m) => {
+                          const parentId = m.reply_to_id!
+                          if (!acc[parentId]) acc[parentId] = []
+                          acc[parentId].push(m)
+                          return acc
+                        }, {} as Record<string, SquadChat[]>)
+                      
+                      return parentMessages.map(msg => {
+                        const agent = agents.find(a => a.name === msg.agent_name)
+                        const replies = repliesMap[msg.id] || []
+                        
+                        return (
+                          <div key={msg.id}>
+                            {/* Parent Message */}
+                            <div className="flex gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors group">
+                              <div 
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                style={{ backgroundColor: agent ? `${agent.color}20` : '#f3f4f6' }}
+                              >
+                                {msg.is_human ? '👤' : (agent?.emoji || '🤖')}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium text-gray-900">{msg.agent_name}</p>
+                                  {msg.is_human && (
+                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 rounded">Human</span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-700 mt-0.5">{msg.message}</p>
+                                {msg.task_ref && (
+                                  <p className="text-[10px] text-blue-500 mt-1">📎 Task: {msg.task_ref}</p>
+                                )}
+                                <div className="flex items-center gap-2 mt-1">
+                                  <p className="text-[10px] text-gray-400">
+                                    {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                                  </p>
+                                  <button
+                                    onClick={() => setReplyingTo(msg)}
+                                    className="text-[10px] text-blue-500 hover:text-blue-700 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+                                  >
+                                    ↩️ Reply
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Replies (indented) */}
+                            {replies.length > 0 && (
+                              <div className="ml-8 border-l-2 border-blue-100 pl-2 space-y-1">
+                                {replies.map(reply => {
+                                  const replyAgent = agents.find(a => a.name === reply.agent_name)
+                                  return (
+                                    <div key={reply.id} className="flex gap-2 p-2 rounded-lg hover:bg-blue-50/50 transition-colors group">
+                                      <div 
+                                        className="w-6 h-6 rounded flex items-center justify-center text-xs shrink-0"
+                                        style={{ backgroundColor: replyAgent ? `${replyAgent.color}20` : '#f3f4f6' }}
+                                      >
+                                        {reply.is_human ? '👤' : (replyAgent?.emoji || '🤖')}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-xs font-medium text-gray-900">{reply.agent_name}</p>
+                                          {reply.is_human && (
+                                            <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">Human</span>
+                                          )}
+                                        </div>
+                                        <p className="text-xs text-gray-700 mt-0.5">{reply.message}</p>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                          <p className="text-[10px] text-gray-400">
+                                            {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                                          </p>
+                                          <button
+                                            onClick={() => setReplyingTo(msg)}
+                                            className="text-[10px] text-blue-500 hover:text-blue-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          >
+                                            ↩️
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    })()
+                  )}
+                  
+                  {/* Reply Input */}
+                  {replyingTo && (
+                    <div className="sticky bottom-0 bg-white border-t border-blue-200 p-2 mt-2 rounded-lg shadow-lg">
+                      <div className="flex items-center gap-2 mb-2 text-xs text-gray-500">
+                        <span>↩️ Replying to</span>
+                        <span className="font-medium text-gray-700">{replyingTo.agent_name}</span>
+                        <button
+                          onClick={() => setReplyingTo(null)}
+                          className="ml-auto text-gray-400 hover:text-gray-600"
                         >
-                          {agent?.emoji || '🤖'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">{msg.agent_name}</p>
-                          <p className="text-sm text-gray-700 mt-0.5">{msg.message}</p>
-                          {msg.task_ref && (
-                            <p className="text-[10px] text-blue-500 mt-1">📎 Task: {msg.task_ref}</p>
-                          )}
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
-                          </p>
-                        </div>
+                          ✕
+                        </button>
                       </div>
-                    )
-                  })
-                )
+                      <div className="text-[10px] text-gray-400 bg-gray-50 p-1.5 rounded mb-2 line-clamp-1">
+                        {replyingTo.message}
+                      </div>
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault()
+                          const form = e.target as HTMLFormElement
+                          const input = form.elements.namedItem('replyMessage') as HTMLInputElement
+                          if (!input.value.trim()) return
+                          
+                          await sendMessage({
+                            agent_name: 'Karl',
+                            message: input.value.trim(),
+                            reply_to_id: replyingTo.id,
+                            is_human: true
+                          })
+                          
+                          input.value = ''
+                          setReplyingTo(null)
+                          fetchData()
+                        }}
+                        className="flex gap-2"
+                      >
+                        <input
+                          name="replyMessage"
+                          type="text"
+                          placeholder="Type your reply..."
+                          className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600"
+                        >
+                          Send
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </>
               ) : (
                 /* Cron Jobs */
                 cronJobs.length === 0 ? (
