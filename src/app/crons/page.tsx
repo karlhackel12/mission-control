@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,263 +12,215 @@ import {
   Clock, 
   Play, 
   History,
-  Plus,
   RefreshCw
 } from 'lucide-react'
-import { formatDistanceToNow, format } from 'date-fns'
-
-type CronJob = {
-  id: string
-  name: string
-  schedule: string
-  description: string
-  enabled: boolean
-  lastRun: Date | null
-  lastStatus: 'success' | 'failed' | 'running' | null
-}
-
-type CronRun = {
-  id: string
-  jobId: string
-  status: 'success' | 'failed' | 'running'
-  output: string
-  ranAt: Date
-}
-
-const initialJobs: CronJob[] = [
-  { id: '1', name: 'Daily Standup Report', schedule: '0 9 * * *', description: 'Generate and send daily standup summary', enabled: true, lastRun: new Date(Date.now() - 1000 * 60 * 60 * 8), lastStatus: 'success' },
-  { id: '2', name: 'Email Inbox Check', schedule: '*/30 * * * *', description: 'Check and summarize new emails', enabled: true, lastRun: new Date(Date.now() - 1000 * 60 * 30), lastStatus: 'success' },
-  { id: '3', name: 'Competitor Price Monitor', schedule: '0 */4 * * *', description: 'Scrape and analyze competitor pricing', enabled: true, lastRun: new Date(Date.now() - 1000 * 60 * 60 * 4), lastStatus: 'success' },
-  { id: '4', name: 'Jira Sync', schedule: '*/15 * * * *', description: 'Sync tasks with Jira boards', enabled: true, lastRun: new Date(Date.now() - 1000 * 60 * 15), lastStatus: 'failed' },
-  { id: '5', name: 'Weekly Analytics Report', schedule: '0 9 * * 1', description: 'Generate weekly analytics summary', enabled: true, lastRun: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), lastStatus: 'success' },
-  { id: '6', name: 'Twitter Mentions Check', schedule: '0 */2 * * *', description: 'Monitor Twitter for brand mentions', enabled: false, lastRun: new Date(Date.now() - 1000 * 60 * 60 * 48), lastStatus: 'success' },
-  { id: '7', name: 'Database Backup', schedule: '0 3 * * *', description: 'Backup all Supabase databases', enabled: true, lastRun: new Date(Date.now() - 1000 * 60 * 60 * 21), lastStatus: 'success' },
-  { id: '8', name: 'Slack Digest', schedule: '0 18 * * 1-5', description: 'Send daily Slack activity digest', enabled: true, lastRun: new Date(Date.now() - 1000 * 60 * 60 * 26), lastStatus: 'success' },
-]
-
-const initialRuns: CronRun[] = [
-  { id: '1', jobId: '2', status: 'success', output: 'Checked 5 new emails. 2 marked important.', ranAt: new Date(Date.now() - 1000 * 60 * 30) },
-  { id: '2', jobId: '4', status: 'failed', output: 'Error: Jira API rate limit exceeded', ranAt: new Date(Date.now() - 1000 * 60 * 15) },
-  { id: '3', jobId: '3', status: 'success', output: 'Analyzed 3 competitors. No price changes detected.', ranAt: new Date(Date.now() - 1000 * 60 * 60 * 4) },
-  { id: '4', jobId: '1', status: 'success', output: 'Standup report sent to #product-team', ranAt: new Date(Date.now() - 1000 * 60 * 60 * 8) },
-  { id: '5', jobId: '2', status: 'success', output: 'Checked 12 new emails. 4 marked important.', ranAt: new Date(Date.now() - 1000 * 60 * 60) },
-]
+import { formatDistanceToNow } from 'date-fns'
+import { getCronJobs, getCronRuns } from '@/lib/supabase/queries'
+import type { CronJob, CronRun } from '@/lib/supabase/types'
+import { PRODUCTS } from '@/lib/constants'
 
 export default function CronsPage() {
-  const [jobs, setJobs] = useState<CronJob[]>(initialJobs)
-  const [runs] = useState<CronRun[]>(initialRuns)
+  const [jobs, setJobs] = useState<CronJob[]>([])
+  const [runs, setRuns] = useState<CronRun[]>([])
   const [selectedJob, setSelectedJob] = useState<CronJob | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [jobsData, runsData] = await Promise.all([
+        getCronJobs(),
+        getCronRuns(undefined, 50)
+      ])
+      setJobs(jobsData)
+      setRuns(runsData)
+    } catch (error) {
+      console.error('Error fetching crons:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    fetchData()
+  }, [fetchData])
 
-  const toggleJob = (jobId: string) => {
-    setJobs(prev => prev.map(job => 
-      job.id === jobId ? { ...job, enabled: !job.enabled } : job
-    ))
-  }
+  const filteredJobs = selectedProduct
+    ? jobs.filter(j => j.product_id === selectedProduct)
+    : jobs
 
-  const runJob = (jobId: string) => {
-    setJobs(prev => prev.map(job => 
-      job.id === jobId ? { ...job, lastRun: new Date(), lastStatus: 'running' } : job
-    ))
-    // Simulate completion
-    setTimeout(() => {
-      setJobs(prev => prev.map(job => 
-        job.id === jobId ? { ...job, lastStatus: 'success' } : job
-      ))
-    }, 2000)
-  }
+  const getProductById = (id: string | null | undefined) => id ? PRODUCTS.find(p => p.id === id) : null
+
+  const getJobRuns = (jobId: string) => runs.filter(r => r.job_id === jobId)
 
   if (!mounted) return null
 
-  const successCount = jobs.filter(j => j.lastStatus === 'success' && j.enabled).length
-  const failedCount = jobs.filter(j => j.lastStatus === 'failed' && j.enabled).length
-  const enabledCount = jobs.filter(j => j.enabled).length
+  if (loading) {
+    return (
+      <div className="h-screen bg-[#FAFAF8] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading cron jobs...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-[#FAFAF8]">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cron Monitor</h1>
-          <p className="text-gray-500">Scheduled jobs and automation</p>
-        </div>
-        <Button variant="outline">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Job
-        </Button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{jobs.length}</p>
-                <p className="text-sm text-gray-500">Total Jobs</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{successCount}</p>
-                <p className="text-sm text-gray-500">Healthy</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <XCircle className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{failedCount}</p>
-                <p className="text-sm text-gray-500">Failed</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Play className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{enabledCount}</p>
-                <p className="text-sm text-gray-500">Active</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Jobs Grid */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Job List */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Scheduled Jobs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {jobs.map((job) => (
-                <div 
-                  key={job.id}
-                  className={`p-4 rounded-lg border transition-colors cursor-pointer ${
-                    selectedJob?.id === job.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'
-                  } ${!job.enabled ? 'opacity-50' : ''}`}
-                  onClick={() => setSelectedJob(job)}
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-gray-900">CRON JOBS</h1>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setSelectedProduct(null)}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${!selectedProduct ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                All
+              </button>
+              {PRODUCTS.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedProduct(p.id)}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${selectedProduct === p.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {job.lastStatus === 'success' && job.enabled && (
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      )}
-                      {job.lastStatus === 'failed' && job.enabled && (
-                        <XCircle className="w-5 h-5 text-red-500" />
-                      )}
-                      {job.lastStatus === 'running' && (
-                        <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
-                      )}
-                      {(!job.lastStatus || !job.enabled) && (
-                        <Clock className="w-5 h-5 text-gray-400" />
-                      )}
-                      <div>
-                        <p className="font-medium text-gray-900">{job.name}</p>
-                        <p className="text-xs text-gray-500 font-mono">{job.schedule}</p>
-                      </div>
-                    </div>
-                    <Switch 
-                      checked={job.enabled}
-                      onCheckedChange={() => toggleJob(job.id)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">{job.description}</p>
-                  {job.lastRun && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      Last run: {formatDistanceToNow(job.lastRun, { addSuffix: true })}
-                    </p>
-                  )}
-                </div>
+                  {p.shortName}
+                </button>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={fetchData}>
+              <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+            </Button>
+            <Badge variant="secondary">{filteredJobs.length} jobs</Badge>
+          </div>
+        </div>
+      </header>
 
-        {/* Run History */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <History className="w-4 h-4" />
-              {selectedJob ? `${selectedJob.name} History` : 'Recent Runs'}
-            </CardTitle>
-            {selectedJob && (
-              <Button 
-                size="sm" 
-                onClick={() => runJob(selectedJob.id)}
-                disabled={selectedJob.lastStatus === 'running'}
-              >
-                <Play className="w-4 h-4 mr-1" />
-                Run Now
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-3">
-                {runs
-                  .filter(run => !selectedJob || run.jobId === selectedJob.id)
-                  .sort((a, b) => b.ranAt.getTime() - a.ranAt.getTime())
-                  .map((run) => {
-                    const job = jobs.find(j => j.id === run.jobId)
-                    return (
-                      <div key={run.id} className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {run.status === 'success' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                            {run.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
-                            {run.status === 'running' && <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />}
-                            <span className="font-medium text-sm">{job?.name}</span>
+      <div className="flex h-[calc(100vh-73px)]">
+        {/* Jobs List */}
+        <div className="w-1/2 border-r border-gray-200 bg-white">
+          <ScrollArea className="h-full">
+            <div className="p-4 space-y-3">
+              {filteredJobs.map(job => {
+                const product = getProductById(job.product_id)
+                const jobRuns = getJobRuns(job.id)
+                const lastRun = jobRuns[0]
+                
+                return (
+                  <Card 
+                    key={job.id}
+                    className={`cursor-pointer transition-all hover:shadow-md ${selectedJob?.id === job.id ? 'ring-2 ring-amber-500' : ''}`}
+                    onClick={() => setSelectedJob(job)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-gray-900">{job.name}</h3>
+                            {product && (
+                              <span 
+                                className="text-[10px] px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: `${product.color}15`, color: product.color }}
+                              >
+                                {product.shortName}
+                              </span>
+                            )}
                           </div>
-                          <Badge 
-                            variant="secondary"
-                            className={
-                              run.status === 'success' ? 'bg-green-100 text-green-700' :
-                              run.status === 'failed' ? 'bg-red-100 text-red-700' :
-                              'bg-blue-100 text-blue-700'
-                            }
-                          >
-                            {run.status}
-                          </Badge>
+                          <p className="text-sm text-gray-500 mb-2">{job.description}</p>
+                          <div className="flex items-center gap-3 text-xs text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {job.schedule}
+                            </span>
+                            {job.last_run && (
+                              <span>Last: {formatDistanceToNow(new Date(job.last_run), { addSuffix: true })}</span>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600 mt-2">{run.output}</p>
-                        <p className="text-xs text-gray-400 mt-2">
-                          {format(run.ranAt, 'MMM d, yyyy HH:mm:ss')}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          {lastRun?.status === 'success' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                          {lastRun?.status === 'failed' && <XCircle className="w-5 h-5 text-red-500" />}
+                          {lastRun?.status === 'running' && <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />}
+                          <Switch checked={job.enabled} />
+                        </div>
                       </div>
-                    )
-                  })}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+              
+              {filteredJobs.length === 0 && (
+                <div className="text-center py-12 text-gray-400">
+                  No cron jobs found
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Job Details / Run History */}
+        <div className="w-1/2 bg-gray-50">
+          {selectedJob ? (
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">{selectedJob.name}</h2>
+                  <p className="text-sm text-gray-500">{selectedJob.description}</p>
+                </div>
+                <Button size="sm">
+                  <Play className="w-4 h-4 mr-1" /> Run Now
+                </Button>
               </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+              
+              <Card className="mb-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-700">Schedule</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <code className="text-lg font-mono bg-gray-100 px-3 py-1 rounded">{selectedJob.schedule}</code>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <History className="w-4 h-4" /> Run History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {getJobRuns(selectedJob.id).slice(0, 10).map(run => (
+                      <div key={run.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        {run.status === 'success' && <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5" />}
+                        {run.status === 'failed' && <XCircle className="w-4 h-4 text-red-500 mt-0.5" />}
+                        {run.status === 'running' && <RefreshCw className="w-4 h-4 text-amber-500 animate-spin mt-0.5" />}
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-700">{run.output_summary || 'No output'}</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {formatDistanceToNow(new Date(run.ran_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {getJobRuns(selectedJob.id).length === 0 && (
+                      <p className="text-sm text-gray-400 text-center py-4">No runs yet</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-400">
+              Select a job to view details
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

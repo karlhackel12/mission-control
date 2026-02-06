@@ -286,7 +286,8 @@ export type Product = Database['public']['Tables']['products']['Row']
 export type Task = Database['public']['Tables']['tasks']['Row']
 export type AgentActivity = Database['public']['Tables']['agent_activity']['Row']
 export type SquadChat = Database['public']['Tables']['squad_chat']['Row']
-export type CronJob = Database['public']['Tables']['cron_jobs']['Row']
+export type CronJobBase = Database['public']['Tables']['cron_jobs']['Row']
+export type CronJob = CronJobBase & { product_id?: string | null }
 export type CronRun = Database['public']['Tables']['cron_runs']['Row']
 export type Integration = Database['public']['Tables']['integrations']['Row']
 
