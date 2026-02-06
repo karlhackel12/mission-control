@@ -7,14 +7,14 @@ import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { 
-  Calendar, 
   Activity, 
   Clock, 
   AlertCircle,
   Users,
   Zap,
   ArrowRight,
-  ListTodo
+  ListTodo,
+  Radio
 } from 'lucide-react'
 import { TopNav } from '@/components/nav'
 
@@ -68,12 +68,12 @@ export default function MissionControlPage() {
   // Navigation cards
   const navCards = [
     {
-      title: 'Calendar',
-      description: 'View scheduled events and deadlines',
-      href: '/calendar',
-      icon: Calendar,
-      color: 'bg-blue-500',
-      hoverColor: 'hover:border-blue-300 hover:bg-blue-50/50',
+      title: 'Sessions',
+      description: 'Active agent sessions in real-time',
+      href: '/sessions',
+      icon: Radio,
+      color: 'bg-green-500',
+      hoverColor: 'hover:border-green-300 hover:bg-green-50/50',
     },
     {
       title: 'Activity Log',

@@ -7,12 +7,14 @@ import {
   Calendar, 
   Activity, 
   Clock, 
-  ListTodo
+  ListTodo,
+  Radio
 } from 'lucide-react'
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/boards', label: 'Tasks', icon: ListTodo },
+  { href: '/sessions', label: 'Sessions', icon: Radio },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/crons', label: 'Crons', icon: Clock },

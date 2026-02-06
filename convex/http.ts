@@ -287,4 +287,67 @@ http.route({
   }),
 });
 
+// ============================================
+// CRON RUN ENDPOINTS
+// ============================================
+
+// POST /cron-run - receive cron run results
+http.route({
+  path: "/cron-run",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      const { openclawId, status, runAtMs, durationMs, summary } = body;
+
+      if (!openclawId) {
+        return new Response(
+          JSON.stringify({ error: "Missing required field: openclawId" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // Find the cron job and update it
+      const cronJob = await ctx.runQuery(api.cronJobs.getByOpenclawId, { openclawId });
+      
+      if (cronJob) {
+        await ctx.runMutation(api.cronJobs.updateRunStatus, {
+          id: cronJob._id,
+          status: status || "success",
+          runAtMs: runAtMs || Date.now(),
+          durationMs: durationMs,
+          summary: summary,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, found: !!cronJob }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error updating cron run:", error);
+      return new Response(
+        JSON.stringify({ error: "Internal server error" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }),
+});
+
+// CORS preflight for /cron-run
+http.route({
+  path: "/cron-run",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }),
+});
+
 export default http;

@@ -193,3 +193,79 @@ export const updateStatus = mutation({
     }
   },
 });
+
+// Get cron job by OpenClaw ID
+export const getByOpenclawId = query({
+  args: { openclawId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("cronJobs")
+      .withIndex("by_openclaw_id", (q) => q.eq("openclawId", args.openclawId))
+      .unique();
+  },
+});
+
+// Update run status with more details
+export const updateRunStatus = mutation({
+  args: {
+    id: v.id("cronJobs"),
+    status: v.union(
+      v.literal("success"),
+      v.literal("failure"),
+      v.literal("running")
+    ),
+    runAtMs: v.number(),
+    durationMs: v.optional(v.number()),
+    summary: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      lastStatus: args.status,
+      lastRunAtMs: args.runAtMs,
+    });
+  },
+});
+
+// Get failed cron jobs (for health monitoring)
+export const getFailedJobs = query({
+  args: {
+    since: v.optional(v.number()), // timestamp, default 24h
+  },
+  handler: async (ctx, args) => {
+    const since = args.since ?? Date.now() - 24 * 60 * 60 * 1000;
+    
+    const jobs = await ctx.db
+      .query("cronJobs")
+      .collect();
+    
+    // Return jobs that failed and haven't run successfully since
+    return jobs.filter((job) => 
+      job.lastStatus === "failure" && 
+      job.isActive &&
+      job.lastRunAtMs && 
+      job.lastRunAtMs >= since
+    );
+  },
+});
+
+// Get stale cron jobs (haven't run when they should have)
+export const getStaleJobs = query({
+  args: {
+    thresholdMs: v.optional(v.number()), // default 2 hours
+  },
+  handler: async (ctx, args) => {
+    const threshold = args.thresholdMs ?? 2 * 60 * 60 * 1000;
+    const now = Date.now();
+    
+    const jobs = await ctx.db
+      .query("cronJobs")
+      .collect();
+    
+    // Return active jobs whose nextRunAtMs is in the past by more than threshold
+    return jobs.filter((job) => 
+      job.isActive &&
+      job.nextRunAtMs &&
+      job.nextRunAtMs < now - threshold
+    );
+  },
+});
