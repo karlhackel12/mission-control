@@ -191,6 +191,140 @@ export const seedActivities = mutation({
   },
 });
 
+// Seed sample memories for testing
+export const seedMemories = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    
+    // Sample memories for different categories
+    const sampleMemories: Array<{
+      content: string;
+      category: "preference" | "fact" | "decision" | "entity" | "other";
+    }> = [
+      // Preferences
+      {
+        content: "Karl prefers to work in the mornings and have meetings in the afternoon",
+        category: "preference",
+      },
+      {
+        content: "Use TypeScript for all new projects, avoid JavaScript",
+        category: "preference",
+      },
+      {
+        content: "Communication should be in Portuguese unless explicitly asked for English",
+        category: "preference",
+      },
+      {
+        content: "Karl likes detailed technical explanations with code examples",
+        category: "preference",
+      },
+      
+      // Facts
+      {
+        content: "Mission Control is built with Next.js 14, Convex, and TailwindCSS",
+        category: "fact",
+      },
+      {
+        content: "HelloPeople is the main product, a recruiting platform",
+        category: "fact",
+      },
+      {
+        content: "The team uses Asana for project management and Slack for communication",
+        category: "fact",
+      },
+      {
+        content: "TransForce and goLance are partner companies sharing infrastructure",
+        category: "fact",
+      },
+      {
+        content: "Karl is the founder and main developer working on AI agents",
+        category: "fact",
+      },
+      
+      // Decisions
+      {
+        content: "Decided to use Convex instead of Supabase for real-time features",
+        category: "decision",
+      },
+      {
+        content: "Moving from monolith to microservices architecture in Q2 2026",
+        category: "decision",
+      },
+      {
+        content: "AI agents will communicate via structured JSON protocols",
+        category: "decision",
+      },
+      
+      // Entities
+      {
+        content: "Developer agent (Dewey) handles coding tasks, git operations, and deployments",
+        category: "entity",
+      },
+      {
+        content: "Marketing agent (Margo) manages social media, content creation, and campaigns",
+        category: "entity",
+      },
+      {
+        content: "Chief agent (Charlie) coordinates tasks and makes high-level decisions",
+        category: "entity",
+      },
+      {
+        content: "Scout agent researches markets, competitors, and gathers intelligence",
+        category: "entity",
+      },
+      
+      // Other
+      {
+        content: "Remember to backup the database every Sunday at midnight",
+        category: "other",
+      },
+      {
+        content: "API rate limits: OpenAI 10k/day, Twitter 500/15min, Slack unlimited",
+        category: "other",
+      },
+      {
+        content: "Production deployments require at least 2 test passes and code review",
+        category: "other",
+      },
+    ];
+    
+    const insertedIds = [];
+    for (const memory of sampleMemories) {
+      const id = await ctx.db.insert("memories", {
+        content: memory.content,
+        category: memory.category,
+        createdAt: now - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000), // Random time in last week
+      });
+      insertedIds.push(id);
+    }
+    
+    return {
+      success: true,
+      insertedCount: insertedIds.length,
+      message: `Seeded ${insertedIds.length} sample memories. Run backfillEmbeddings action to add vector embeddings.`,
+    };
+  },
+});
+
+// Clear all memories (use with caution!)
+export const clearMemories = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const memories = await ctx.db.query("memories").collect();
+    
+    for (const memory of memories) {
+      await ctx.db.delete(memory._id);
+    }
+    
+    return {
+      success: true,
+      deletedCount: memories.length,
+      message: `Deleted ${memories.length} memories`,
+    };
+  },
+});
+
 // Clear all seeded activities
 export const clearSeededActivities = mutation({
   args: {},

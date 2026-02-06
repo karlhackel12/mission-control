@@ -11,6 +11,7 @@
 import type * as activities from "../activities.js";
 import type * as agents from "../agents.js";
 import type * as cronJobs from "../cronJobs.js";
+import type * as embeddings from "../embeddings.js";
 import type * as http from "../http.js";
 import type * as memories from "../memories.js";
 import type * as messages from "../messages.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   activities: typeof activities;
   agents: typeof agents;
   cronJobs: typeof cronJobs;
+  embeddings: typeof embeddings;
   http: typeof http;
   memories: typeof memories;
   messages: typeof messages;
