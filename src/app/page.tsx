@@ -14,7 +14,8 @@ import {
   Zap,
   ArrowRight,
   ListTodo,
-  Radio
+  Radio,
+  Calendar
 } from 'lucide-react'
 import { TopNav } from '@/components/nav'
 
@@ -99,7 +100,34 @@ export default function MissionControlPage() {
       color: 'bg-emerald-500',
       hoverColor: 'hover:border-emerald-300 hover:bg-emerald-50/50',
     },
+    {
+      title: 'Calendar',
+      description: 'Weekly schedule view',
+      href: '/calendar',
+      icon: Calendar,
+      color: 'bg-blue-500',
+      hoverColor: 'hover:border-blue-300 hover:bg-blue-50/50',
+    },
   ]
+
+  // Helper to calculate agent status from lastSeenAt
+  const getAgentStatus = (lastSeenAt: number | undefined): { status: 'connected' | 'idle' | 'offline'; color: string; label: string } => {
+    if (!lastSeenAt) {
+      return { status: 'offline', color: 'bg-gray-300', label: 'OFFLINE' };
+    }
+    const now = Date.now();
+    const diff = now - lastSeenAt;
+    const fiveMin = 5 * 60 * 1000;
+    const thirtyMin = 30 * 60 * 1000;
+    
+    if (diff < fiveMin) {
+      return { status: 'connected', color: 'bg-green-500', label: 'CONNECTED' };
+    } else if (diff < thirtyMin) {
+      return { status: 'idle', color: 'bg-yellow-500', label: 'IDLE' };
+    } else {
+      return { status: 'offline', color: 'bg-gray-300', label: 'OFFLINE' };
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAF8]">
@@ -269,13 +297,18 @@ export default function MissionControlPage() {
                 Agent Status
               </h2>
               <span className="text-sm text-gray-400">
-                {activeAgents} working
+                {agents?.filter(a => getAgentStatus(a.lastSeenAt).status === 'connected').length || 0} online
               </span>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
               {agents?.map((agent) => {
-                const isActive = activeAgentIds.has(agent._id)
+                const agentStatus = getAgentStatus(agent.lastSeenAt)
                 const taskCount = tasks?.filter(t => t.assignedTo === agent._id && t.status !== 'done').length || 0
+                const statusColors: Record<string, string> = {
+                  connected: 'text-green-600',
+                  idle: 'text-yellow-600',
+                  offline: 'text-gray-400',
+                }
                 return (
                   <div key={agent._id} className="p-4 flex items-center gap-3">
                     <div 
@@ -302,9 +335,9 @@ export default function MissionControlPage() {
                         </span>
                       )}
                       <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                        <span className={`text-xs ${isActive ? 'text-green-600' : 'text-gray-400'}`}>
-                          {isActive ? 'ACTIVE' : 'IDLE'}
+                        <span className={`w-2 h-2 rounded-full ${agentStatus.color}`}></span>
+                        <span className={`text-xs ${statusColors[agentStatus.status]}`}>
+                          {agentStatus.label}
                         </span>
                       </div>
                     </div>

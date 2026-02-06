@@ -350,4 +350,159 @@ http.route({
   }),
 });
 
+// ============================================
+// CRON SYNC ENDPOINTS
+// ============================================
+
+// POST /cron-sync - sync cron jobs from OpenClaw
+http.route({
+  path: "/cron-sync",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      const { jobs } = body;
+
+      if (!jobs || !Array.isArray(jobs)) {
+        return new Response(
+          JSON.stringify({ error: "Missing required field: jobs (array)" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // Get all agents for mapping
+      const allAgents = await ctx.runQuery(api.agents.list, {});
+      const agentLookup = new Map<string, Id<"agents">>();
+      for (const agent of allAgents) {
+        if (agent.openclawAgentId) {
+          agentLookup.set(agent.openclawAgentId, agent._id);
+        }
+        agentLookup.set(agent.name.toLowerCase(), agent._id);
+      }
+
+      let synced = 0;
+      let errors: string[] = [];
+
+      for (const job of jobs) {
+        try {
+          // Resolve agentId from job.agentId string
+          let resolvedAgentId: Id<"agents"> | undefined = undefined;
+          if (job.agentId) {
+            resolvedAgentId = agentLookup.get(job.agentId) || 
+                             agentLookup.get(job.agentId.toLowerCase());
+          }
+
+          // Map OpenClaw job format to Convex cronJobs.sync format
+          await ctx.runMutation(api.cronJobs.sync, {
+            openclawId: job.id,
+            name: job.name,
+            description: job.payload?.message?.substring(0, 200) || undefined,
+            schedule: job.schedule?.expr || job.schedule?.at || "unknown",
+            product: undefined, // OpenClaw doesn't have product field
+            agentId: resolvedAgentId,
+            payload: job.payload,
+            nextRunAtMs: job.state?.nextRunAtMs,
+            lastRunAtMs: job.state?.lastRunAtMs,
+            lastStatus: job.state?.lastStatus,
+            isActive: job.enabled !== false,
+          });
+          synced++;
+        } catch (err) {
+          errors.push(`${job.id}: ${err}`);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          synced, 
+          total: jobs.length,
+          errors: errors.length > 0 ? errors : undefined 
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error syncing cron jobs:", error);
+      return new Response(
+        JSON.stringify({ error: "Internal server error" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }),
+});
+
+// CORS preflight for /cron-sync
+http.route({
+  path: "/cron-sync",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }),
+});
+
+// ============================================
+// AGENT HEARTBEAT ENDPOINTS
+// ============================================
+
+// POST /agent-heartbeat - update agent lastSeenAt timestamp
+http.route({
+  path: "/agent-heartbeat",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      const { agentId, status } = body;
+
+      if (!agentId) {
+        return new Response(
+          JSON.stringify({ error: "Missing required field: agentId" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate status
+      const validStatus = status === "active" || status === "idle" ? status : undefined;
+
+      const id = await ctx.runMutation(api.agents.updateHeartbeat, {
+        openclawAgentId: agentId,
+        status: validStatus,
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, found: !!id }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error updating agent heartbeat:", error);
+      return new Response(
+        JSON.stringify({ error: "Internal server error" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }),
+});
+
+// CORS preflight for /agent-heartbeat
+http.route({
+  path: "/agent-heartbeat",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }),
+});
+
 export default http;

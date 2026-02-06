@@ -11,6 +11,7 @@ export default defineSchema({
     badge: v.optional(v.string()),
     openclawAgentId: v.optional(v.string()),
     isActive: v.boolean(),
+    lastSeenAt: v.optional(v.number()), // Heartbeat timestamp for status display
     createdAt: v.number(),
   })
     .index("by_openclaw_id", ["openclawAgentId"])

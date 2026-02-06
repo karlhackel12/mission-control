@@ -81,3 +81,36 @@ export const update = mutation({
     await ctx.db.patch(id, filteredUpdates);
   },
 });
+
+// Update agent heartbeat (lastSeenAt timestamp)
+export const updateHeartbeat = mutation({
+  args: {
+    openclawAgentId: v.string(),
+    status: v.optional(v.union(v.literal("active"), v.literal("idle"))),
+  },
+  handler: async (ctx, args) => {
+    // Find agent by openclawAgentId or name
+    let agent = await ctx.db
+      .query("agents")
+      .withIndex("by_openclaw_id", (q) => q.eq("openclawAgentId", args.openclawAgentId))
+      .unique();
+    
+    if (!agent) {
+      // Try by name (case-insensitive)
+      const allAgents = await ctx.db.query("agents").collect();
+      agent = allAgents.find(
+        (a) => a.name.toLowerCase() === args.openclawAgentId.toLowerCase() ||
+               a.openclawAgentId === args.openclawAgentId
+      ) || null;
+    }
+    
+    if (agent) {
+      await ctx.db.patch(agent._id, {
+        lastSeenAt: Date.now(),
+      });
+      return agent._id;
+    }
+    
+    return null;
+  },
+});

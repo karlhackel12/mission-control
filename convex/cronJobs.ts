@@ -59,6 +59,8 @@ export const sync = mutation({
     agentId: v.optional(v.id("agents")),
     payload: v.optional(v.any()),
     nextRunAtMs: v.optional(v.number()),
+    lastRunAtMs: v.optional(v.number()),
+    lastStatus: v.optional(v.string()),
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -66,6 +68,12 @@ export const sync = mutation({
       .query("cronJobs")
       .withIndex("by_openclaw_id", (q) => q.eq("openclawId", args.openclawId))
       .unique();
+    
+    // Normalize lastStatus to valid enum value
+    const validStatuses = ["success", "failure", "running"] as const;
+    const normalizedStatus = args.lastStatus && validStatuses.includes(args.lastStatus as any) 
+      ? args.lastStatus as "success" | "failure" | "running"
+      : undefined;
     
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -76,12 +84,24 @@ export const sync = mutation({
         agentId: args.agentId,
         payload: args.payload,
         nextRunAtMs: args.nextRunAtMs,
+        lastRunAtMs: args.lastRunAtMs,
+        lastStatus: normalizedStatus,
         isActive: args.isActive,
       });
       return existing._id;
     } else {
       return await ctx.db.insert("cronJobs", {
-        ...args,
+        openclawId: args.openclawId,
+        name: args.name,
+        description: args.description,
+        schedule: args.schedule,
+        product: args.product,
+        agentId: args.agentId,
+        payload: args.payload,
+        nextRunAtMs: args.nextRunAtMs,
+        lastRunAtMs: args.lastRunAtMs,
+        lastStatus: normalizedStatus,
+        isActive: args.isActive,
         createdAt: Date.now(),
       });
     }
