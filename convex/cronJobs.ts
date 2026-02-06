@@ -1,0 +1,112 @@
+import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
+
+// List all cron jobs
+export const list = query({
+  args: {
+    agentId: v.optional(v.id("agents")),
+    activeOnly: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    let jobs;
+    
+    if (args.agentId) {
+      jobs = await ctx.db
+        .query("cronJobs")
+        .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+        .collect();
+    } else {
+      jobs = await ctx.db.query("cronJobs").collect();
+    }
+    
+    if (args.activeOnly) {
+      jobs = jobs.filter((j) => j.isActive);
+    }
+    
+    return jobs.sort((a, b) => (a.nextRunAtMs ?? 0) - (b.nextRunAtMs ?? 0));
+  },
+});
+
+// Get upcoming cron jobs for calendar
+export const getUpcoming = query({
+  args: {
+    startMs: v.number(),
+    endMs: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("cronJobs")
+      .withIndex("by_next_run")
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("nextRunAtMs"), args.startMs),
+          q.lte(q.field("nextRunAtMs"), args.endMs),
+          q.eq(q.field("isActive"), true)
+        )
+      )
+      .collect();
+  },
+});
+
+// Sync cron job from OpenClaw
+export const sync = mutation({
+  args: {
+    openclawId: v.string(),
+    name: v.string(),
+    schedule: v.string(),
+    agentId: v.optional(v.id("agents")),
+    payload: v.optional(v.any()),
+    nextRunAtMs: v.optional(v.number()),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("cronJobs")
+      .withIndex("by_openclaw_id", (q) => q.eq("openclawId", args.openclawId))
+      .unique();
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        name: args.name,
+        schedule: args.schedule,
+        agentId: args.agentId,
+        payload: args.payload,
+        nextRunAtMs: args.nextRunAtMs,
+        isActive: args.isActive,
+      });
+      return existing._id;
+    } else {
+      return await ctx.db.insert("cronJobs", {
+        ...args,
+        createdAt: Date.now(),
+      });
+    }
+  },
+});
+
+// Update cron job status after run
+export const updateStatus = mutation({
+  args: {
+    openclawId: v.string(),
+    lastStatus: v.union(
+      v.literal("success"),
+      v.literal("failure"),
+      v.literal("running")
+    ),
+    nextRunAtMs: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const job = await ctx.db
+      .query("cronJobs")
+      .withIndex("by_openclaw_id", (q) => q.eq("openclawId", args.openclawId))
+      .unique();
+    
+    if (job) {
+      await ctx.db.patch(job._id, {
+        lastStatus: args.lastStatus,
+        lastRunAtMs: Date.now(),
+        nextRunAtMs: args.nextRunAtMs,
+      });
+    }
+  },
+});
